@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Network {
+  MAINNET
+  DEVNET
+}
+
+enum Token {
+  NATIVE
+  USDC
+  USDT
+}
+
 // Merchant: Data providers who receive payments
 model Merchant {
   id            String        @id @default(uuid())
@@ -30,6 +41,11 @@ model Resource {
   type        String   // IMAGE, VIDEO, LINK
   price       Float    @default(0)
   
+  // Multi-network & Multi-token support
+  network     Network  @default(MAINNET)
+  token       Token    @default(NATIVE)
+  mintAddress String?  // Optional for SPL tokens
+
   // For IMAGE type: base64 encoded data
   imageData   String?  @db.Text
   
@@ -62,6 +78,10 @@ model Transaction {
   merchant               Merchant  @relation(fields: [merchantId], references: [id])
   agentId                String
   amount                 Float
+  
+  network                Network   @default(MAINNET)
+  token                  Token     @default(NATIVE)
+  
   status                 String    // PENDING, DELIVERED, SETTLED, REFUND_REQUESTED, REFUNDED
   dataPayload            String?
   expiryAt               DateTime
@@ -71,3 +91,4 @@ model Transaction {
 
   @@index([merchantId])
 }
+

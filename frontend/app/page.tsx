@@ -31,7 +31,16 @@ export default function Home() {
                             <span className="text-2xl">🏢</span>
                         </div>
                         <h2 className="text-lg font-bold mb-2">Merchant Dashboard</h2>
-                        <p className="text-gray-500 text-center text-sm">Manage escrow, view funds, and resolve disputes.</p>
+                        <p className="text-gray-500 text-center text-sm">Manage resources, escrow, and resolve disputes.</p>
+                    </Link>
+
+                    <Link href="/demo/x402" className="group relative w-64 p-8 bg-gray-900 hover:bg-gray-800 rounded-2xl border border-blue-500/40 hover:border-blue-500/60 transition-all duration-300 flex flex-col items-center">
+                        <div className="absolute inset-0 bg-blue-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/20">
+                            <span className="text-2xl">🏁</span>
+                        </div>
+                        <h2 className="text-lg font-bold mb-2 text-blue-400">x402 Simulator</h2>
+                        <p className="text-gray-500 text-center text-sm">Interactive agent payment simulation with real wallet.</p>
                     </Link>
 
                     <Link href="/demo" className="group relative w-64 p-8 bg-gray-900 hover:bg-gray-800 rounded-2xl border border-gray-800 hover:border-green-500/50 transition-all duration-300 flex flex-col items-center">
@@ -39,8 +48,8 @@ export default function Home() {
                         <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border border-gray-700">
                             <span className="text-2xl">🤖</span>
                         </div>
-                        <h2 className="text-lg font-bold mb-2">Agent Demo</h2>
-                        <p className="text-gray-500 text-center text-sm">Simulate an AI agent purchasing premium data.</p>
+                        <h2 className="text-lg font-bold mb-2">Static Demo</h2>
+                        <p className="text-gray-500 text-center text-sm">Step-by-step walkthrough of the ZK payment flow.</p>
                     </Link>
                 </div>
             </div>

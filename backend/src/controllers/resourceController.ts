@@ -9,6 +9,9 @@ interface CreateResourceBody {
     price?: number;
     imageData?: string; // base64 for IMAGE type
     url?: string;       // URL for VIDEO/LINK type
+    network?: 'MAINNET' | 'DEVNET';
+    token?: 'NATIVE' | 'USDC' | 'USDT';
+    mintAddress?: string;
 }
 
 interface UpdateResourceBody extends Partial<CreateResourceBody> {
@@ -109,6 +112,11 @@ export const createResource = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'url is required for VIDEO/LINK type' });
         }
 
+        // Validation: Network and Token pairing
+        if (body.network === 'DEVNET' && body.token && body.token !== 'NATIVE') {
+            return res.status(400).json({ error: 'Devnet only supports Native SOL payments' });
+        }
+
         const resource = await prisma.resource.create({
             data: {
                 merchantId,
@@ -116,6 +124,9 @@ export const createResource = async (req: Request, res: Response) => {
                 description: body.description,
                 type: body.type,
                 price: body.price || 0,
+                network: body.network || 'MAINNET',
+                token: body.token || 'NATIVE',
+                mintAddress: body.token === 'NATIVE' ? null : body.mintAddress,
                 imageData: body.type === 'IMAGE' ? body.imageData : null,
                 url: body.type !== 'IMAGE' ? body.url : null,
             }
@@ -128,6 +139,9 @@ export const createResource = async (req: Request, res: Response) => {
                 description: resource.description,
                 type: resource.type,
                 price: resource.price,
+                network: resource.network,
+                token: resource.token,
+                mintAddress: resource.mintAddress,
                 url: resource.url,
                 isActive: resource.isActive,
                 createdAt: resource.createdAt
@@ -162,6 +176,11 @@ export const updateResource = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Resource not found' });
         }
 
+        // Validation: Network and Token pairing
+        if (body.network && body.token && body.network === 'DEVNET' && body.token !== 'NATIVE') {
+            return res.status(400).json({ error: 'Devnet only supports Native SOL payments' });
+        }
+
         const resource = await prisma.resource.update({
             where: { id },
             data: {
@@ -169,6 +188,9 @@ export const updateResource = async (req: Request, res: Response) => {
                 description: body.description,
                 price: body.price,
                 isActive: body.isActive,
+                network: body.network,
+                token: body.token,
+                mintAddress: body.token === 'NATIVE' ? null : body.mintAddress,
                 // Only update imageData/url if type matches
                 ...(existing.type === 'IMAGE' && body.imageData && { imageData: body.imageData }),
                 ...(existing.type !== 'IMAGE' && body.url && { url: body.url }),

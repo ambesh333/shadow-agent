@@ -19,6 +19,9 @@ export default function NewResourcePage() {
     const [url, setUrl] = useState('');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageData, setImageData] = useState<string | null>(null);
+    const [network, setNetwork] = useState<'MAINNET' | 'DEVNET'>('MAINNET');
+    const [token, setToken] = useState<'NATIVE' | 'USDC' | 'USDT'>('NATIVE');
+    const [mintAddress, setMintAddress] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +75,9 @@ export default function NewResourcePage() {
                     description: description.trim() || undefined,
                     type,
                     price: parseFloat(price) || 0,
+                    network,
+                    token,
+                    mintAddress: token === 'NATIVE' ? undefined : mintAddress.trim(),
                     imageData: type === 'IMAGE' ? imageData : undefined,
                     url: type !== 'IMAGE' ? url.trim() : undefined,
                 })
@@ -156,9 +162,61 @@ export default function NewResourcePage() {
                         />
                     </div>
 
+                    {/* Network Selector */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-2">Network</label>
+                            <select
+                                value={network}
+                                onChange={(e) => {
+                                    const val = e.target.value as 'MAINNET' | 'DEVNET';
+                                    setNetwork(val);
+                                    if (val === 'DEVNET') setToken('NATIVE');
+                                }}
+                                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
+                            >
+                                <option value="MAINNET">Solana Mainnet</option>
+                                <option value="DEVNET">Solana Devnet</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-2">Token</label>
+                            <select
+                                value={token}
+                                onChange={(e) => setToken(e.target.value as any)}
+                                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
+                            >
+                                <option value="NATIVE">SOL (Native)</option>
+                                {network === 'MAINNET' && (
+                                    <>
+                                        <option value="USDC">USDC</option>
+                                        <option value="USDT">USDT</option>
+                                    </>
+                                )}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Mint Address (if SPL) */}
+                    {token !== 'NATIVE' && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-2">SPL Token Mint Address (Optional)</label>
+                            <input
+                                type="text"
+                                value={mintAddress}
+                                onChange={(e) => setMintAddress(e.target.value)}
+                                placeholder="Auto-fills for USDC/USDT if left blank"
+                                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                            />
+                        </div>
+                    )}
+
                     {/* Price */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">Price (USD)</label>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                            Price ({token === 'NATIVE' ? 'SOL' : token})
+                        </label>
                         <input
                             type="number"
                             value={price}

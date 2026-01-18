@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { API_URL } from '@/lib/config';
 import { useAuth } from '@/components/AuthContext';
-import { Package, Plus, ExternalLink, Image, Video, Loader2, Trash2 } from 'lucide-react';
+import { Package, Plus, ExternalLink, Image, Video, Loader2, Trash2, Copy } from 'lucide-react';
 
 interface Resource {
     id: string;
@@ -12,6 +12,8 @@ interface Resource {
     type: 'IMAGE' | 'VIDEO' | 'LINK';
     price: number;
     url: string | null;
+    network: 'MAINNET' | 'DEVNET';
+    token: 'NATIVE' | 'USDC' | 'USDT';
     isActive: boolean;
     createdAt: string;
 }
@@ -133,8 +135,13 @@ export default function ResourcesPage() {
                                         {resource.type}
                                     </span>
                                 </div>
-                                <div className={`text-xs px-2 py-0.5 rounded ${resource.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-600 text-gray-400'}`}>
-                                    {resource.isActive ? 'Active' : 'Inactive'}
+                                <div className="flex flex-col items-end gap-1">
+                                    <div className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${resource.network === 'MAINNET' ? 'bg-blue-500/10 text-blue-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                                        {resource.network}
+                                    </div>
+                                    <div className={`text-xs px-2 py-0.5 rounded ${resource.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-600 text-gray-400'}`}>
+                                        {resource.isActive ? 'Active' : 'Inactive'}
+                                    </div>
                                 </div>
                             </div>
 
@@ -143,8 +150,39 @@ export default function ResourcesPage() {
                                 {resource.description || 'No description'}
                             </p>
 
+                            <div className="mb-4">
+                                <label className="text-[10px] uppercase font-bold text-gray-500 block mb-1">x402 Gateway URL</label>
+                                <div className="flex items-center gap-2 bg-gray-900 p-2 rounded border border-gray-700">
+                                    <code className="text-[10px] text-blue-400 truncate flex-1">
+                                        {`http://localhost:3001/api/gateway/resource/${resource.id}`}
+                                    </code>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(`http://localhost:3001/api/gateway/resource/${resource.id}`);
+                                            alert('Gateway URL copied!');
+                                        }}
+                                        className="text-gray-500 hover:text-white transition-colors"
+                                        title="Copy URL"
+                                    >
+                                        <Copy size={12} />
+                                    </button>
+                                    <Link
+                                        href={`/demo/x402?url=${encodeURIComponent(`http://localhost:3001/api/gateway/resource/${resource.id}`)}`}
+                                        className="text-gray-500 hover:text-blue-400 transition-colors"
+                                        title="Test in Simulator"
+                                    >
+                                        <ExternalLink size={12} />
+                                    </Link>
+                                </div>
+                            </div>
+
                             <div className="flex items-center justify-between pt-3 border-t border-gray-700">
-                                <span className="text-lg font-bold text-green-400">${resource.price.toFixed(4)}</span>
+                                <div className="flex flex-col">
+                                    <span className="text-lg font-bold text-white">
+                                        {resource.price.toFixed(resource.token === 'NATIVE' ? 4 : 2)}
+                                        <span className="ml-1 text-sm text-gray-500">{resource.token === 'NATIVE' ? 'SOL' : resource.token}</span>
+                                    </span>
+                                </div>
                                 <button
                                     onClick={() => handleDelete(resource.id)}
                                     className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
