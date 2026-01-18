@@ -5,10 +5,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// @ts-ignore
-export const prisma = new PrismaClient({
-    datasourceUrl: process.env.DATABASE_URL,
-});
+// Prisma 6: datasource URL is configured in schema.prisma
+export const prisma = new PrismaClient();
 
 export const shadowPay = new ShadowPayClient(
     process.env.SHADOW_API_URL || 'https://shadow.radr.fun',

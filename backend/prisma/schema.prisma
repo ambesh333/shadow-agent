@@ -4,17 +4,70 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
+// Merchant: Data providers who receive payments
+model Merchant {
+  id            String        @id @default(uuid())
+  walletAddress String        @unique
+  displayName   String?
+  lastLogin     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  transactions  Transaction[]
+  resources     Resource[]
+}
+
+// Resource: Media assets (images stored as base64, videos as URLs)
+model Resource {
+  id          String   @id @default(uuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  type        String   // IMAGE, VIDEO, LINK
+  price       Float    @default(0)
+  
+  // For IMAGE type: base64 encoded data
+  imageData   String?  @db.Text
+  
+  // For VIDEO/LINK type: external URL
+  url         String?
+  
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([merchantId])
+}
+
+// AuthChallenge: Short-lived nonces for SIWS
+model AuthChallenge {
+  id            String   @id @default(uuid())
+  walletAddress String
+  nonce         String   @unique
+  expiresAt     DateTime
+  used          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([walletAddress])
+}
+
+// Transaction: Escrow records
 model Transaction {
-  id              String   @id @default(uuid())
-  merchantId      String
-  agentId         String
-  amount          Float
-  status          String   // PENDING, DELIVERED, SETTLED, REFUND_REQUESTED, REFUNDED
-  dataPayload     String?
-  expiryAt        DateTime
+  id                     String    @id @default(uuid())
+  merchantId             String
+  merchant               Merchant  @relation(fields: [merchantId], references: [id])
+  agentId                String
+  amount                 Float
+  status                 String    // PENDING, DELIVERED, SETTLED, REFUND_REQUESTED, REFUNDED
+  dataPayload            String?
+  expiryAt               DateTime
   encryptedDisputeReason String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([merchantId])
 }

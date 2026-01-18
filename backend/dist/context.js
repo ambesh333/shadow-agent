@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.shadowPay = exports.prisma = void 0;
+// @ts-nocheck
 const client_1 = require("@prisma/client");
 const shadowPayClient_1 = require("./clients/shadowPayClient");
 const dotenv_1 = __importDefault(require("dotenv"));
