@@ -100,12 +100,29 @@ function X402DemoContent() {
             const signature = await signMessage(message);
             const signatureBase64 = Buffer.from(signature).toString('base64');
 
+            const payloadObj = {
+                resource: requirements.resource,
+                payTo: requirements.payTo,
+                amount: requirements.maxAmountRequired,
+                wallet: publicKey.toBase58(),
+                nonce: Math.random().toString(36).substring(7),
+                proof: signatureBase64
+            };
+
+            const finalHeader = JSON.stringify({
+                x402Version: 1,
+                scheme: 'zkproof',
+                network: requirements.network,
+                payload: payloadObj
+            });
+            const payloadBase64 = Buffer.from(finalHeader).toString('base64');
+
             addLog('Signature generated successfully.');
             addLog('Sending X-Payment header to gateway...');
 
             const res = await fetch(url, {
                 headers: {
-                    'X-Payment': signatureBase64,
+                    'X-Payment': payloadBase64,
                     'X-Agent-Wallet': publicKey.toBase58()
                 }
             });
