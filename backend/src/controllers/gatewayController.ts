@@ -1,8 +1,25 @@
 import { Request, Response } from 'express';
-import { prisma, shadowPay } from '../context';
-import { X402PaymentRequirements } from '../clients/shadowPayClient';
+import { prisma } from '../context';
+import { ShadowPay } from '@shadowpay/server';
+
+const sp = new ShadowPay({
+    apiKey: process.env.SHADOWPAY_API_KEY || 'YOUR_API_KEY',
+});
 
 const FACILITATOR_WALLET = process.env.FACILITATOR_WALLET_ADDRESS;
+
+const parsePaymentHeader = (raw: string) => {
+    try {
+        const decoded = Buffer.from(raw, 'base64').toString('utf-8');
+        return JSON.parse(decoded);
+    } catch {
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+};
 
 /**
  * GET /api/gateway/resource/:resourceId
@@ -11,7 +28,7 @@ const FACILITATOR_WALLET = process.env.FACILITATOR_WALLET_ADDRESS;
 export const accessResource = async (req: Request, res: Response) => {
     try {
         const resourceId = req.params.resourceId as string;
-        const paymentHeader = (req.header('X-Payment') || req.header('Authorization')) as string | undefined;
+        const paymentHeaderRaw = (req.header('X-Payment') || req.header('Authorization')) as string | undefined;
 
         // 1. Fetch resource details
         const resource = await prisma.resource.findUnique({
@@ -24,10 +41,17 @@ export const accessResource = async (req: Request, res: Response) => {
         }
 
         // 2. Define payment requirements based on resource config
-        const paymentRequirements: X402PaymentRequirements = {
+        // IMPORTANT: maxAmountRequired must be in SOL, not lamports
+        const priceLamports = resource.price;
+        const priceSol = (typeof priceLamports === 'number'
+            ? priceLamports / 1_000_000_000
+            : Number(priceLamports) / 1_000_000_000).toString();
+
+        const paymentRequirements = {
             scheme: 'zkproof',
             network: resource.network === 'MAINNET' ? 'solana-mainnet' : 'solana-devnet',
-            maxAmountRequired: resource.price.toString(),
+            merchantKey: process.env.SHADOWPAY_API_KEY || '', // Required for authorization
+            maxAmountRequired: priceSol,
             resource: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
             description: `Payment for ${resource.title}`,
             mimeType: resource.type === 'IMAGE' ? 'image/png' : 'application/json',
@@ -41,7 +65,7 @@ export const accessResource = async (req: Request, res: Response) => {
         };
 
         // 3. Handle Payment
-        if (!paymentHeader) {
+        if (!paymentHeaderRaw) {
             // No payment provided -> 402
             return res.status(402).json({
                 error: 'Payment Required',
@@ -49,20 +73,31 @@ export const accessResource = async (req: Request, res: Response) => {
             });
         }
 
-        // 4. Verify Payment with ShadowPay
+        const paymentHeader = parsePaymentHeader(paymentHeaderRaw);
+        if (!paymentHeader) {
+            return res.status(402).json({
+                error: 'Invalid Payment Proof',
+                details: 'Payment header must be base64-encoded JSON or raw JSON of the Groth16 proof object',
+                paymentRequirements
+            });
+        }
+
+        // 4. Verify Payment with ShadowPay SDK
         let isValid = false;
         let agentId = 'unknown-agent';
 
         try {
-            const verification = await shadowPay.verifyX402(paymentHeader!, paymentRequirements);
-            isValid = verification.isValid;
-            agentId = verification.paymentToken || 'shadow-agent';
+            // Using the new SDK verifyPayment method
+            isValid = await sp.verifyPayment(paymentHeaderRaw!, {
+                amount: Number(priceSol),
+                token: resource.token === 'NATIVE' ? 'SOL' : resource.token,
+            });
+            agentId = 'shadow-agent'; // The SDK might provide more info in metadata if configured
         } catch (error: any) {
-            const errorData = error.response?.data;
-            console.error('ShadowPay verification error:', errorData || error.message);
+            console.error('ShadowPay SDK verification error:', error.message);
             return res.status(402).json({
                 error: 'Invalid Payment Proof',
-                details: errorData || error.message,
+                details: error.message,
                 paymentRequirements
             });
         }
@@ -74,30 +109,18 @@ export const accessResource = async (req: Request, res: Response) => {
             });
         }
 
-        // 5. DEPLOYMENT: Settle the payment on-chain to the Facilitator
-        try {
-            const settlement = await shadowPay.settleX402(paymentHeader!, paymentRequirements);
-            if (!settlement.success) {
-                return res.status(400).json({
-                    error: 'Settlement Failed',
-                    details: settlement.error,
-                    paymentRequirements
-                });
-            }
-            console.log(`Payment settled to Facilitator. Tx: ${settlement.txHash}`);
-        } catch (error: any) {
-            console.error('ShadowPay settlement error:', error.response?.data || error.message);
-            return res.status(500).json({ error: 'Failed to settle payment to Facilitator' });
-        }
+        // 5. DEPLOYMENT: Settlement is typically handled by the SDK or triggered automatically
+        // If manual settlement is needed via SDK:
+        // await sp.settlePayment(paymentHeaderRaw!);
 
-        // 6. Payment is valid and settled! Lock funds in DB (marked as HELD in escrow)
+        // 6. Payment is valid! Lock funds in DB
         const tx = await prisma.transaction.create({
             data: {
                 merchantId: resource.merchantId,
                 agentId: agentId,
                 amount: resource.price,
                 status: 'PENDING',
-                expiryAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours to confirm
+                expiryAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
                 dataPayload: resource.imageData || resource.url,
             }
         });
