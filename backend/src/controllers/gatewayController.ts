@@ -50,7 +50,7 @@ export const accessResource = async (req: Request, res: Response) => {
         const paymentRequirements = {
             scheme: 'zkproof',
             network: resource.network === 'MAINNET' ? 'solana-mainnet' : 'solana-devnet',
-            merchantKey: process.env.SHADOWPAY_API_KEY || '', // Required for authorization
+            merchantKey: process.env.MERCHANT_KEY || '', // Required for authorization
             maxAmountRequired: priceSol,
             resource: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
             description: `Payment for ${resource.title}`,

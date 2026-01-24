@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./wallet-override.css";
 
 :root {
   --background: #ffffff;
@@ -23,4 +24,16 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   letter-spacing: -0.02em;
   overflow-x: hidden;
+}
+
+/* Custom gradient utilities */
+.bg-warm-gradient {
+  background: linear-gradient(to right, #000000, #1a0a00, #2d1810, #792300);
+}
+
+.text-gradient-orange {
+  background: linear-gradient(to right, #ff8c42, #ff6b35);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

@@ -10,7 +10,7 @@ export function ConnectWalletButton() {
 
     // Not connected to wallet yet
     if (!connected) {
-        return <WalletMultiButton className="!bg-blue-600 hover:!bg-blue-500 !rounded-lg !font-bold" />;
+        return <WalletMultiButton className="!bg-[#FF8E40] hover:!bg-[#FF5832] !rounded-full !font-semibold !px-8 !py-3 !text-sm !transition-colors" />;
     }
 
     // Connected but not authenticated
@@ -20,7 +20,7 @@ export function ConnectWalletButton() {
                 <button
                     onClick={signIn}
                     disabled={isLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-8 py-3 bg-[#FF8E40] hover:bg-[#FF5832] rounded-full font-semibold text-sm transition-colors disabled:opacity-50"
                 >
                     {isLoading ? (
                         <>
@@ -33,7 +33,7 @@ export function ConnectWalletButton() {
                     )}
                 </button>
                 {error && (
-                    <div className="flex items-center gap-1 text-red-400 text-xs">
+                    <div className="flex items-center gap-1 text-[#FF5832] text-xs">
                         <AlertCircle size={12} /> {error}
                     </div>
                 )}
@@ -52,7 +52,7 @@ export function ConnectWalletButton() {
             </div>
             <button
                 onClick={signOut}
-                className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full text-sm transition-colors"
             >
                 <LogOut size={16} /> Sign Out
             </button>

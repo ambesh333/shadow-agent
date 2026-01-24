@@ -1,0 +1,131 @@
+/* Override Solana Wallet Adapter Modal Styles */
+
+/* Modal backdrop/overlay - full screen transparent */
+.wallet-adapter-modal-wrapper {
+    background: rgba(0, 0, 0, 0.9) !important;
+}
+
+/* Modal overlay container - DO NOT style the box here */
+.wallet-adapter-modal {
+    background: transparent !important;
+    border: none !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    transform: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* The actual modal box/container */
+.wallet-adapter-modal-container {
+    background: #000000 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 24px !important;
+    max-width: 400px !important;
+    width: 90% !important;
+    padding: 24px !important;
+    text-align: center !important;
+    margin: 0 !important;
+    position: relative !important;
+    /* For close button positioning */
+}
+
+/* Inner wrapper - remove all padding */
+.wallet-adapter-modal-wrapper {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Modal title - minimal padding */
+.wallet-adapter-modal-title {
+    color: #F4F4F5 !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    padding: 0 0 16px 0 !important;
+    margin: 0 !important;
+}
+
+/* Modal description */
+.wallet-adapter-modal p {
+    color: rgba(255, 255, 255, 0.6) !important;
+    text-align: center !important;
+    margin: 0 0 24px 0 !important;
+}
+
+/* Middle section - no padding */
+.wallet-adapter-modal-middle {
+    text-align: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Wallet buttons list */
+.wallet-adapter-modal-list {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.wallet-adapter-modal-list-more {
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+    margin-top: 12px !important;
+    padding-top: 12px !important;
+}
+
+/* Individual wallet button */
+.wallet-adapter-button {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    color: #F4F4F5 !important;
+    padding: 16px !important;
+    margin-bottom: 8px !important;
+    transition: all 0.2s ease !important;
+}
+
+.wallet-adapter-button:hover {
+    background: rgba(255, 142, 64, 0.1) !important;
+    border-color: rgba(255, 142, 64, 0.3) !important;
+}
+
+.wallet-adapter-button-trigger {
+    background: #FF8E40 !important;
+    border: none !important;
+    color: white !important;
+}
+
+.wallet-adapter-button-trigger:hover {
+    background: #FF5832 !important;
+}
+
+/* Close button */
+.wallet-adapter-modal-button-close {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    position: absolute !important;
+    top: 16px !important;
+    right: 16px !important;
+}
+
+.wallet-adapter-modal-button-close:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.wallet-adapter-modal-button-close svg {
+    fill: #F4F4F5 !important;
+}
+
+/* Collapse button */
+.wallet-adapter-collapse {
+    background: transparent !important;
+    color: #FF8E40 !important;
+}
+
+.wallet-adapter-collapse:hover {
+    color: #FF5832 !important;
+}
