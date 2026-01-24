@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { prisma } from './context';
+import { startAutoSettleJob } from './jobs/autoSettleJob';
 
 dotenv.config();
 
@@ -31,13 +32,23 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
 });
 
+// Auto-settle job interval reference
+let autoSettleInterval: NodeJS.Timeout | null = null;
+
 // Start server
 app.listen(PORT, () => {
     console.log(`Facilitator Service running on port ${PORT}`);
+
+    // Start auto-settle job (runs every minute)
+    autoSettleInterval = startAutoSettleJob(60000);
 });
 
 // Handle shutdown
 process.on('SIGINT', async () => {
+    // Clear auto-settle interval
+    if (autoSettleInterval) {
+        clearInterval(autoSettleInterval);
+    }
     await prisma.$disconnect();
     process.exit();
 });

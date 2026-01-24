@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { Transaction } from '@solana/web3.js';
 import { ShadowPay } from '@shadowpay/client';
 
-type Step = 'welcome' | 'menu' | 'url-input' | 'fetching' | 'payment' | 'unlocked' | 'error';
+type Step = 'welcome' | 'menu' | 'url-input' | 'fetching' | 'payment' | 'unlocked' | 'error' | 'deposit-network' | 'deposit-input' | 'depositing';
 
 interface TerminalLine {
     text: string;
@@ -18,7 +20,8 @@ interface MenuOption {
 
 export default function TerminalDemo() {
     const wallet = useWallet();
-    const { connected, publicKey } = wallet;
+    const { connection } = useConnection();
+    const { connected, publicKey, signTransaction } = wallet;
 
     const [currentStep, setCurrentStep] = useState<Step>('welcome');
     const [selectedMenuItem, setSelectedMenuItem] = useState(0);
@@ -27,6 +30,8 @@ export default function TerminalDemo() {
     const [isLoading, setIsLoading] = useState(false);
     const [paymentData, setPaymentData] = useState<any>(null);
     const [unlockedContent, setUnlockedContent] = useState<any>(null);
+    const [depositNetwork, setDepositNetwork] = useState<'mainnet' | 'devnet'>('devnet');
+    const [depositMenuIndex, setDepositMenuIndex] = useState(0);
 
     const terminalRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +91,26 @@ export default function TerminalDemo() {
                 }
                 addLine('', 'normal');
                 addLine('Press Enter to return to menu...', 'prompt');
+            }
+        },
+        {
+            label: 'Deposit to Escrow',
+            action: () => {
+                if (!connected || !publicKey) {
+                    clearTerminal();
+                    addLine('✗ Please connect your wallet first', 'error');
+                    addLine('', 'normal');
+                    addLine('Press Enter to return to menu...', 'prompt');
+                    return;
+                }
+                clearTerminal();
+                addLine('💰 Deposit SOL to ShadowPay Escrow', 'info');
+                addLine('', 'normal');
+                addLine('This funds your escrow for ZK payments.', 'normal');
+                addLine('', 'normal');
+                addLine('Select network:', 'prompt');
+                setDepositMenuIndex(0);
+                setCurrentStep('deposit-network');
             }
         },
         {
@@ -177,10 +202,97 @@ export default function TerminalDemo() {
             });
 
             if (res.ok) {
-                const data = await res.json();
-                setUnlockedContent(data);
+                const contentType = res.headers.get('content-type') || '';
                 addLine('✓ Payment successful!', 'success');
                 addLine('✓ Resource unlocked', 'success');
+                addLine('', 'normal');
+
+                // Check if response is an image
+                if (contentType.includes('image/')) {
+                    addLine('📷 Downloading image to your computer...', 'info');
+                    const blob = await res.blob();
+                    const filename = `unlocked_${Date.now()}.${contentType.split('/')[1] || 'png'}`;
+
+                    // Auto-download the image
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(downloadUrl);
+
+                    // Get receipt info from headers
+                    const receiptCode = res.headers.get('X-Receipt-Code');
+                    const autoSettleAt = res.headers.get('X-Auto-Settle-At');
+                    const merchantName = res.headers.get('X-Merchant-Name');
+
+                    addLine(`✓ Image saved as: ${filename}`, 'success');
+                    addLine(`  Size: ${(blob.size / 1024).toFixed(1)} KB`, 'info');
+                    addLine('', 'normal');
+
+                    // Display receipt
+                    if (receiptCode) {
+                        addLine('═══════════════════════════════════════════', 'normal');
+                        addLine('        PAYMENT RECEIPT', 'info');
+                        addLine('═══════════════════════════════════════════', 'normal');
+                        addLine(`Receipt ID:      ${receiptCode}`, 'normal');
+                        if (merchantName) addLine(`Merchant:        ${merchantName}`, 'normal');
+                        const amount = paymentData?.maxAmountRequired || '0';
+                        addLine(`Amount:          ${amount} SOL`, 'normal');
+                        addLine('───────────────────────────────────────────', 'normal');
+                        if (autoSettleAt) {
+                            const settleDate = new Date(autoSettleAt);
+                            addLine(`Auto-Approval:   ${settleDate.toLocaleTimeString()}`, 'info');
+                        }
+                        addLine('═══════════════════════════════════════════', 'normal');
+                    }
+
+                    setUnlockedContent({ type: 'image', filename, size: blob.size, receiptCode });
+                } else if (contentType.includes('application/json')) {
+                    // JSON response - parse and display
+                    const data = await res.json();
+
+                    // Display receipt info if present
+                    if (data.receiptCode) {
+                        addLine('═══════════════════════════════════════════', 'normal');
+                        addLine('        PAYMENT RECEIPT', 'info');
+                        addLine('═══════════════════════════════════════════', 'normal');
+                        addLine(`Receipt ID:      ${data.receiptCode}`, 'normal');
+                        if (data.merchantName) addLine(`Merchant:        ${data.merchantName}`, 'normal');
+                        if (data.title) addLine(`Resource:        ${data.title}`, 'normal');
+                        const amount = paymentData?.maxAmountRequired || data.price || '0';
+                        addLine(`Amount:          ${amount} SOL`, 'normal');
+                        addLine('───────────────────────────────────────────', 'normal');
+                        if (data.autoSettleAt) {
+                            const settleDate = new Date(data.autoSettleAt);
+                            const minutesLeft = Math.round((settleDate.getTime() - Date.now()) / 60000);
+                            addLine(`Auto-Approval:   ${minutesLeft} minutes`, 'info');
+                            addLine(`Expires At:      ${settleDate.toLocaleTimeString()}`, 'normal');
+                        }
+                        addLine('───────────────────────────────────────────', 'normal');
+                        addLine('[Enter] Confirm OK  |  [D] Dispute', 'prompt');
+                        addLine('═══════════════════════════════════════════', 'normal');
+                    } else {
+                        addLine('📄 JSON data received:', 'info');
+                    }
+
+                    setUnlockedContent(data);
+                } else {
+                    // Text or link content
+                    const text = await res.text();
+
+                    // Check if it's a URL
+                    if (text.startsWith('http://') || text.startsWith('https://')) {
+                        setUnlockedContent({ type: 'link', url: text });
+                        addLine('🔗 Link:', 'info');
+                    } else {
+                        setUnlockedContent({ type: 'text', content: text });
+                        addLine('📝 Content:', 'info');
+                    }
+                }
+
                 setCurrentStep('unlocked');
             } else {
                 addLine(`✗ Payment failed: HTTP ${res.status}`, 'error');
@@ -188,6 +300,103 @@ export default function TerminalDemo() {
             }
         } catch (e: any) {
             addLine(`✗ Error: ${e.message}`, 'error');
+            setCurrentStep('error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleDeposit = async (amountStr: string) => {
+        if (!connected || !publicKey || !signTransaction) {
+            addLine('✗ Wallet not connected', 'error');
+            return;
+        }
+
+        const amount = parseFloat(amountStr);
+        if (isNaN(amount) || amount < 0) {
+            addLine('✗ Invalid amount', 'error');
+            addLine('', 'normal');
+            addLine('Enter amount in SOL (e.g., 0.1):', 'prompt');
+            return;
+        }
+
+        setCurrentStep('depositing');
+        setIsLoading(true);
+
+        addLine(`💳 Depositing ${amount} SOL...`, 'info');
+        addLine('', 'normal');
+
+        try {
+            // Convert SOL to lamports
+            const lamports = Math.floor(amount * 1_000_000_000);
+
+            // Determine API URL based on network
+            const apiUrl = depositNetwork === 'devnet'
+                ? 'https://shadow.radr.fun/shadowpay/api/escrow/deposit'
+                : 'https://shadow.radr.fun/shadowpay/api/escrow/deposit';
+
+            // Format network like gateway controller does
+            const networkParam = depositNetwork === 'devnet' ? 'solana-devnet' : 'solana-mainnet';
+
+            addLine(`📡 Requesting deposit transaction (${networkParam})...`, 'info');
+
+            // Call ShadowPay escrow deposit API
+            const res = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    wallet_address: publicKey.toBase58(),
+                    amount: lamports,
+                    network: networkParam, // Pass network in solana-devnet/solana-mainnet format
+                }),
+            });
+
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({}));
+                throw new Error(error.error || `HTTP ${res.status}`);
+            }
+
+            const data = await res.json();
+            addLine('✓ Transaction received', 'success');
+
+            // Decode and sign the transaction
+            addLine('🔐 Please sign the transaction in your wallet...', 'info');
+
+            const txBuffer = Buffer.from(data.transaction, 'base64');
+            const tx = Transaction.from(txBuffer);
+            tx.recentBlockhash = data.recent_blockhash;
+            tx.feePayer = publicKey;
+
+            const signedTx = await signTransaction(tx);
+            addLine('✓ Transaction signed', 'success');
+
+            // Submit to Solana
+            addLine('📤 Submitting to Solana network...', 'info');
+            const signature = await connection.sendRawTransaction(signedTx.serialize());
+
+            addLine(`✓ Transaction submitted: ${signature.slice(0, 8)}...`, 'success');
+            addLine('', 'normal');
+            addLine('⏳ Waiting for confirmation...', 'info');
+
+            // Wait for confirmation
+            await connection.confirmTransaction(signature, 'confirmed');
+
+            addLine('', 'normal');
+            addLine(`✓ Deposit successful!`, 'success');
+            addLine(`  Amount: ${amount} SOL`, 'info');
+            addLine(`  TX: ${signature}`, 'info');
+            addLine('', 'normal');
+            addLine('Your escrow is now funded for ZK payments!', 'success');
+            addLine('', 'normal');
+            addLine('Press Enter to return to menu...', 'prompt');
+            setCurrentStep('unlocked');
+
+        } catch (e: any) {
+            addLine(`✗ Error: ${e.message}`, 'error');
+            addLine('', 'normal');
+            addLine('Press Enter to return to menu...', 'prompt');
             setCurrentStep('error');
         } finally {
             setIsLoading(false);
@@ -248,6 +457,31 @@ export default function TerminalDemo() {
         } else if (currentStep === 'url-input') {
             if (e.key === 'Enter' && currentInput.trim()) {
                 handleFetchResource(currentInput);
+            }
+            // Ctrl+C to clear input only
+            if (e.ctrlKey && e.key === 'c') {
+                e.preventDefault();
+                setCurrentInput('');
+            }
+        } else if (currentStep === 'deposit-network') {
+            const networkOptions = ['devnet', 'mainnet'] as const;
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setDepositMenuIndex(prev => (prev > 0 ? prev - 1 : networkOptions.length - 1));
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setDepositMenuIndex(prev => (prev < networkOptions.length - 1 ? prev + 1 : 0));
+            } else if (e.key === 'Enter') {
+                setDepositNetwork(networkOptions[depositMenuIndex]);
+                addLine(`✓ Selected: ${networkOptions[depositMenuIndex].toUpperCase()}`, 'success');
+                addLine('', 'normal');
+                addLine('Enter amount in SOL (e.g., 0.1):', 'prompt');
+                setCurrentStep('deposit-input');
+            }
+        } else if (currentStep === 'deposit-input') {
+            if (e.key === 'Enter' && currentInput.trim()) {
+                handleDeposit(currentInput);
+                setCurrentInput('');
             }
             // Ctrl+C to clear input only
             if (e.ctrlKey && e.key === 'c') {
@@ -330,7 +564,38 @@ export default function TerminalDemo() {
                             </div>
                         )}
 
-                        {(currentStep === 'url-input' || currentStep === 'fetching' || currentStep === 'payment' || currentStep === 'unlocked' || currentStep === 'error') && (
+                        {currentStep === 'deposit-network' && (
+                            <div>
+                                {terminalHistory.map((line, i) => (
+                                    <div
+                                        key={i}
+                                        className={`mb-1 ${line.type === 'success' ? 'text-[#27c93f]' :
+                                            line.type === 'error' ? 'text-[#FF5832]' :
+                                                line.type === 'info' ? 'text-[#FFB657]' :
+                                                    line.type === 'prompt' ? 'text-[#FF8E40]' :
+                                                        'text-gray-300'
+                                            }`}
+                                    >
+                                        {line.text}
+                                    </div>
+                                ))}
+                                <div className="mt-2 space-y-1">
+                                    {['Devnet (Testing)', 'Mainnet (Production)'].map((label, i) => (
+                                        <div
+                                            key={i}
+                                            className={`cursor-pointer py-1 ${depositMenuIndex === i ? 'text-[#FF8E40]' : 'text-gray-400'}`}
+                                        >
+                                            {depositMenuIndex === i ? '> ' : '  '}{label}
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-gray-500 mt-4 text-xs">
+                                    Use ↑↓ to select, Enter to confirm
+                                </p>
+                            </div>
+                        )}
+
+                        {(currentStep === 'url-input' || currentStep === 'fetching' || currentStep === 'payment' || currentStep === 'unlocked' || currentStep === 'error' || currentStep === 'deposit-input' || currentStep === 'depositing') && (
                             <div>
                                 {terminalHistory.map((line, i) => (
                                     <div
@@ -361,6 +626,22 @@ export default function TerminalDemo() {
                                     </div>
                                 )}
 
+                                {currentStep === 'deposit-input' && (
+                                    <div className="flex items-center mt-2">
+                                        <span className="text-[#FF8E40] mr-2">&gt;</span>
+                                        <input
+                                            ref={inputRef}
+                                            type="text"
+                                            value={currentInput}
+                                            onChange={(e) => setCurrentInput(e.target.value)}
+                                            className="flex-1 bg-transparent text-white outline-none border-none"
+                                            placeholder="0.1"
+                                            autoFocus
+                                        />
+                                        <span className="text-gray-500 ml-2">SOL</span>
+                                    </div>
+                                )}
+
                                 {isLoading && (
                                     <div className="text-[#FF8E40] mt-2">
                                         <span className="animate-pulse">...</span>
@@ -380,11 +661,48 @@ export default function TerminalDemo() {
 
                                 {currentStep === 'unlocked' && unlockedContent && (
                                     <div className="mt-4">
-                                        <div className="bg-white/5 border border-white/10 rounded p-4">
-                                            <pre className="text-gray-300 text-xs overflow-x-auto">
-                                                {JSON.stringify(unlockedContent, null, 2)}
-                                            </pre>
-                                        </div>
+                                        {/* Image - already downloaded */}
+                                        {unlockedContent.type === 'image' && (
+                                            <div className="bg-white/5 border border-white/10 rounded p-4">
+                                                <p className="text-[#27c93f]">✓ Image downloaded to your Downloads folder</p>
+                                                <p className="text-gray-400 text-sm mt-1">Filename: {unlockedContent.filename}</p>
+                                                <p className="text-gray-500 text-xs">Size: {(unlockedContent.size / 1024).toFixed(1)} KB</p>
+                                            </div>
+                                        )}
+
+                                        {/* Link content */}
+                                        {unlockedContent.type === 'link' && (
+                                            <div className="bg-white/5 border border-white/10 rounded p-4">
+                                                <a
+                                                    href={unlockedContent.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[#FF8E40] hover:text-[#FFB657] underline break-all"
+                                                >
+                                                    {unlockedContent.url}
+                                                </a>
+                                                <p className="text-gray-500 text-xs mt-2">Cmd+Click to open</p>
+                                            </div>
+                                        )}
+
+                                        {/* Text content */}
+                                        {unlockedContent.type === 'text' && (
+                                            <div className="bg-white/5 border border-white/10 rounded p-4">
+                                                <pre className="text-gray-300 text-xs overflow-x-auto whitespace-pre-wrap">
+                                                    {unlockedContent.content}
+                                                </pre>
+                                            </div>
+                                        )}
+
+                                        {/* JSON content (no type field means it's raw JSON) */}
+                                        {!unlockedContent.type && (
+                                            <div className="bg-white/5 border border-white/10 rounded p-4">
+                                                <pre className="text-gray-300 text-xs overflow-x-auto">
+                                                    {JSON.stringify(unlockedContent, null, 2)}
+                                                </pre>
+                                            </div>
+                                        )}
+
                                         <p className="text-[#FF8E40] mt-4">Press Enter to return to menu...</p>
                                     </div>
                                 )}

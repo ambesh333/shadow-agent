@@ -41,11 +41,8 @@ export const accessResource = async (req: Request, res: Response) => {
         }
 
         // 2. Define payment requirements based on resource config
-        // IMPORTANT: maxAmountRequired must be in SOL, not lamports
-        const priceLamports = resource.price;
-        const priceSol = (typeof priceLamports === 'number'
-            ? priceLamports / 1_000_000_000
-            : Number(priceLamports) / 1_000_000_000).toString();
+        // Price is already stored in SOL (user inputs SOL in frontend)
+        const priceSol = resource.price.toString();
 
         const paymentRequirements = {
             scheme: 'zkproof',
@@ -73,30 +70,58 @@ export const accessResource = async (req: Request, res: Response) => {
             });
         }
 
-        const paymentHeader = parsePaymentHeader(paymentHeaderRaw);
-        if (!paymentHeader) {
-            return res.status(402).json({
-                error: 'Invalid Payment Proof',
-                details: 'Payment header must be base64-encoded JSON or raw JSON of the Groth16 proof object',
-                paymentRequirements
-            });
-        }
-
-        // 4. Verify Payment with ShadowPay SDK
+        // 4. Verify Payment - try JWT access token first, then ZK proof
         let isValid = false;
         let agentId = 'unknown-agent';
 
         try {
-            // Using the new SDK verifyPayment method
-            isValid = await sp.verifyPayment(paymentHeaderRaw!, {
-                amount: Number(priceSol),
-                token: resource.token === 'NATIVE' ? 'SOL' : resource.token,
-            });
-            agentId = 'shadow-agent'; // The SDK might provide more info in metadata if configured
+            // First, try to verify as a JWT access token (from ShadowPay SDK)
+            // JWT tokens start with "eyJ"
+            if (paymentHeaderRaw.startsWith('eyJ')) {
+                console.log('Detected JWT access token, verifying with ShadowPay API...');
+                const verifyResponse = await fetch('https://shadow.radr.fun/shadowpay/v1/payment/verify-access', {
+                    method: 'GET',
+                    headers: {
+                        'X-Access-Token': paymentHeaderRaw
+                    }
+                });
+
+                if (verifyResponse.ok) {
+                    const verifyData = await verifyResponse.json();
+                    isValid = verifyData.authorized === true;
+                    agentId = 'shadow-agent';
+                    console.log('Access token verified:', verifyData);
+                } else {
+                    const errorData = await verifyResponse.json().catch(() => ({}));
+                    console.log('Access token verification failed:', errorData);
+                    return res.status(402).json({
+                        error: 'Invalid Access Token',
+                        details: errorData.error || 'Access token verification failed',
+                        paymentRequirements
+                    });
+                }
+            } else {
+                // Try to parse as ZK proof (base64 JSON or raw JSON)
+                const paymentHeader = parsePaymentHeader(paymentHeaderRaw);
+                if (!paymentHeader) {
+                    return res.status(402).json({
+                        error: 'Invalid Payment Proof',
+                        details: 'Payment header must be a JWT access token or base64-encoded JSON of the Groth16 proof object',
+                        paymentRequirements
+                    });
+                }
+
+                // Verify ZK proof with SDK
+                isValid = await sp.verifyPayment(paymentHeaderRaw, {
+                    amount: Number(priceSol),
+                    token: resource.token === 'NATIVE' ? 'SOL' : resource.token,
+                });
+                agentId = 'shadow-agent';
+            }
         } catch (error: any) {
-            console.error('ShadowPay SDK verification error:', error.message);
+            console.error('ShadowPay verification error:', error.message);
             return res.status(402).json({
-                error: 'Invalid Payment Proof',
+                error: 'Payment Verification Failed',
                 details: error.message,
                 paymentRequirements
             });
@@ -113,26 +138,40 @@ export const accessResource = async (req: Request, res: Response) => {
         // If manual settlement is needed via SDK:
         // await sp.settlePayment(paymentHeaderRaw!);
 
-        // 6. Payment is valid! Lock funds in DB
+        // 6. Payment is valid! Lock funds in DB with escrow info
+        // Generate unique receipt code (short alphanumeric)
+        const receiptCode = `RCP-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+        // Calculate auto-settle time based on resource config
+        const autoSettleAt = new Date(Date.now() + (resource.autoApprovalMinutes || 60) * 60 * 1000);
+
         const tx = await prisma.transaction.create({
             data: {
                 merchantId: resource.merchantId,
                 agentId: agentId,
                 amount: resource.price,
+                network: resource.network,
+                token: resource.token,
                 status: 'PENDING',
                 expiryAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
                 dataPayload: resource.imageData || resource.url,
+                receiptCode: receiptCode,
+                autoSettleAt: autoSettleAt,
+                merchantPubKey: resource.merchant.walletAddress, // For dispute encryption
             }
         });
 
-        // 7. Deliver Resource
+        // 7. Deliver Resource with receipt info
         if (resource.type === 'IMAGE' && resource.imageData) {
             const base64Data = resource.imageData.replace(/^data:image\/\w+;base64,/, '');
             const img = Buffer.from(base64Data, 'base64');
             res.writeHead(200, {
                 'Content-Type': 'image/png',
                 'Content-Length': img.length,
-                'X-Transaction-ID': tx.id
+                'X-Transaction-ID': tx.id,
+                'X-Receipt-Code': tx.receiptCode,
+                'X-Auto-Settle-At': tx.autoSettleAt?.toISOString() || '',
+                'X-Merchant-Name': resource.merchant.displayName || 'Merchant',
             });
             return res.end(img);
         }
@@ -140,6 +179,10 @@ export const accessResource = async (req: Request, res: Response) => {
         return res.json({
             success: true,
             transactionId: tx.id,
+            receiptCode: tx.receiptCode,
+            merchantName: resource.merchant.displayName || 'Merchant',
+            autoSettleAt: tx.autoSettleAt?.toISOString(),
+            autoApprovalMinutes: resource.autoApprovalMinutes,
             title: resource.title,
             type: resource.type,
             data: resource.url || resource.imageData

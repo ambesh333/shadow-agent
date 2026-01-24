@@ -12,6 +12,7 @@ interface CreateResourceBody {
     network?: 'MAINNET' | 'DEVNET';
     token?: 'NATIVE' | 'USDC' | 'USDT';
     mintAddress?: string;
+    autoApprovalMinutes?: number; // Auto-settle timeout for escrow
 }
 
 interface UpdateResourceBody extends Partial<CreateResourceBody> {
@@ -41,6 +42,7 @@ export const listResources = async (req: Request, res: Response) => {
                 price: true,
                 url: true,
                 isActive: true,
+                autoApprovalMinutes: true,
                 createdAt: true,
                 updatedAt: true,
                 // Exclude imageData from list to reduce payload size
@@ -129,6 +131,7 @@ export const createResource = async (req: Request, res: Response) => {
                 mintAddress: body.token === 'NATIVE' ? null : body.mintAddress,
                 imageData: body.type === 'IMAGE' ? body.imageData : null,
                 url: body.type !== 'IMAGE' ? body.url : null,
+                autoApprovalMinutes: body.autoApprovalMinutes || 60,
             }
         });
 
@@ -144,6 +147,7 @@ export const createResource = async (req: Request, res: Response) => {
                 mintAddress: resource.mintAddress,
                 url: resource.url,
                 isActive: resource.isActive,
+                autoApprovalMinutes: resource.autoApprovalMinutes,
                 createdAt: resource.createdAt
             }
         });

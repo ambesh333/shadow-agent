@@ -52,6 +52,9 @@ model Resource {
   // For VIDEO/LINK type: external URL
   url         String?
   
+  // Auto-approval timeout for escrow
+  autoApprovalMinutes Int @default(60)
+  
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -85,10 +88,16 @@ model Transaction {
   status                 String    // PENDING, DELIVERED, SETTLED, REFUND_REQUESTED, REFUNDED
   dataPayload            String?
   expiryAt               DateTime
+  
+  // Escrow enhancements
+  receiptCode            String    @unique @default(uuid())
+  autoSettleAt           DateTime?
   encryptedDisputeReason String?
+  merchantPubKey         String?   // For dispute message encryption
+  
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
   @@index([merchantId])
+  @@index([autoSettleAt])
 }
-

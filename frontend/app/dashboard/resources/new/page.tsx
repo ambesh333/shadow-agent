@@ -22,6 +22,7 @@ export default function NewResourcePage() {
     const [network, setNetwork] = useState<'MAINNET' | 'DEVNET'>('MAINNET');
     const [token, setToken] = useState<'NATIVE' | 'USDC' | 'USDT'>('NATIVE');
     const [mintAddress, setMintAddress] = useState('');
+    const [autoApprovalMinutes, setAutoApprovalMinutes] = useState('60');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -80,6 +81,7 @@ export default function NewResourcePage() {
                     mintAddress: token === 'NATIVE' ? undefined : mintAddress.trim(),
                     imageData: type === 'IMAGE' ? imageData : undefined,
                     url: type !== 'IMAGE' ? url.trim() : undefined,
+                    autoApprovalMinutes: parseInt(autoApprovalMinutes) || 60,
                 })
             });
 
@@ -225,6 +227,24 @@ export default function NewResourcePage() {
                             step="0.001"
                             className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
                         />
+                    </div>
+
+                    {/* Auto-Approval Time */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                            Auto-Approval Time (minutes)
+                        </label>
+                        <input
+                            type="number"
+                            value={autoApprovalMinutes}
+                            onChange={(e) => setAutoApprovalMinutes(e.target.value)}
+                            min="1"
+                            step="1"
+                            className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Time before automatic payment to merchant if buyer doesn&apos;t confirm or dispute
+                        </p>
                     </div>
 
                     {/* Image Upload (for IMAGE type) */}
