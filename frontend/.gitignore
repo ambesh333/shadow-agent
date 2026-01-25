@@ -33,3 +33,5 @@ ts-debug.log*
 next-env.d.ts
 
 shadow.json
+
+.env

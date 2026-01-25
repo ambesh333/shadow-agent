@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useConnection } from '@solana/wallet-adapter-react';
-import { Transaction } from '@solana/web3.js';
+import { Transaction, TransactionInstruction } from '@solana/web3.js';
 import { ShadowPay } from '@shadowpay/client';
+import { depositToPool, getPoolBalance, payWithShadowWire } from '../lib/shadowWire';
 
 type Step = 'welcome' | 'menu' | 'url-input' | 'fetching' | 'payment' | 'unlocked' | 'error' | 'deposit-network' | 'deposit-input' | 'depositing';
 
@@ -114,6 +115,46 @@ export default function TerminalDemo() {
             }
         },
         {
+            label: 'Check Balance',
+            action: async () => {
+                if (!connected || !publicKey) {
+                    clearTerminal();
+                    addLine('✗ Please connect your wallet first', 'error');
+                    addLine('', 'normal');
+                    addLine('Press Enter to return to menu...', 'prompt');
+                    return;
+                }
+                clearTerminal();
+                addLine('💰 Checking ShadowWire Balance...', 'info');
+
+                try {
+                    const balance = await getPoolBalance(wallet);
+
+                    // Convert Lamports to SOL (1 SOL = 1,000,000,000 Lamports)
+                    const formatSol = (lamports: number) => (lamports / 1_000_000_000).toFixed(9);
+
+                    addLine('', 'normal');
+                    addLine('═══════════════════════════════════════════', 'normal');
+                    addLine('        SHADOW WIRE BALANCE', 'info');
+                    addLine('═══════════════════════════════════════════', 'normal');
+                    addLine(`Available:       ${formatSol(balance.available)} SOL`, 'success');
+                    addLine(`Deposited:       ${formatSol(balance.deposited)} SOL`, 'normal');
+                    addLine(`Withdrawn:       ${formatSol(balance.withdrawn_to_escrow)} SOL`, 'normal');
+                    addLine('═══════════════════════════════════════════', 'normal');
+                    addLine('', 'normal');
+                } catch (e: any) {
+                    addLine(`✗ Error: ${e.message}`, 'error');
+                }
+
+                addLine('Press Enter to return to menu...', 'prompt');
+                // No special step, stay on generic page or redirect
+                // We reuse 'unlocked' step behavior for "Press Enter to return"
+                setCurrentStep('unlocked');
+                // Hack: clear unlockedContent so it doesn't show old content
+                setUnlockedContent(null);
+            }
+        },
+        {
             label: 'Clear History',
             action: () => {
                 localStorage.removeItem('x402_registered_urls');
@@ -160,6 +201,7 @@ export default function TerminalDemo() {
         }
     };
 
+
     const handlePayment = async () => {
         if (!connected || !publicKey || !paymentData) {
             addLine('✗ Wallet not connected', 'error');
@@ -171,32 +213,34 @@ export default function TerminalDemo() {
         addLine('Connecting to wallet...', 'info');
         addLine('✓ Wallet connected', 'success');
         addLine('', 'normal');
-        addLine('Signing transaction...', 'info');
+        addLine('Generating ZK Proof & Signing...', 'info');
 
         try {
-            // Initialize ShadowPay client with merchant info from paymentData
-            const client = new ShadowPay({
-                merchantKey: paymentData.merchantKey,
-                merchantWallet: paymentData.payTo,
-            });
-
-            // Execute payment with proper options
             // Map "NATIVE" token to "SOL" for SDK
-            const token = paymentData.extra?.token === 'NATIVE' ? 'SOL' : (paymentData.extra?.token || 'SOL');
-            const paymentResult = await client.pay({
-                amount: Number(paymentData.maxAmountRequired),
-                token: token,
-                wallet: wallet as any,
-            });
+            // We use the same amount logic as before
+            const amount = Number(paymentData.maxAmountRequired);
 
-            addLine('✓ Transaction signed', 'success');
+            // Execute payment using ShadowWire SDK helper
+            // This generates the ZK proof and submits the transaction/proof to the relay
+            const paymentResult = await payWithShadowWire(
+                wallet,
+                paymentData.payTo,
+                amount
+            );
+
+            addLine('✓ Payment Proof Generated', 'success');
+            addLine(`  TX: ${paymentResult.tx_signature?.slice(0, 8)}...`, 'info');
             addLine('', 'normal');
-            addLine('Processing payment...', 'info');
+            addLine('Accessing resource...', 'info');
 
-            // Use access token to fetch resource
+            // The backend expects a JSON object (parsed from Base64 or raw).
+            // We verify specific fields in the backend, so we send the full result object.
+            const paymentPayload = JSON.stringify(paymentResult);
+            const paymentHeader = btoa(paymentPayload);
+
             const res = await fetch(currentInput, {
                 headers: {
-                    'X-Payment': paymentResult.accessToken,
+                    'X-Payment': paymentHeader,
                     'X-Agent-Wallet': publicKey.toBase58()
                 },
             });
@@ -239,8 +283,8 @@ export default function TerminalDemo() {
                         addLine('═══════════════════════════════════════════', 'normal');
                         addLine(`Receipt ID:      ${receiptCode}`, 'normal');
                         if (merchantName) addLine(`Merchant:        ${merchantName}`, 'normal');
-                        const amount = paymentData?.maxAmountRequired || '0';
-                        addLine(`Amount:          ${amount} SOL`, 'normal');
+                        const amountInfo = paymentData?.maxAmountRequired || '0';
+                        addLine(`Amount:          ${amountInfo} SOL`, 'normal');
                         addLine('───────────────────────────────────────────', 'normal');
                         if (autoSettleAt) {
                             const settleDate = new Date(autoSettleAt);
@@ -262,8 +306,8 @@ export default function TerminalDemo() {
                         addLine(`Receipt ID:      ${data.receiptCode}`, 'normal');
                         if (data.merchantName) addLine(`Merchant:        ${data.merchantName}`, 'normal');
                         if (data.title) addLine(`Resource:        ${data.title}`, 'normal');
-                        const amount = paymentData?.maxAmountRequired || data.price || '0';
-                        addLine(`Amount:          ${amount} SOL`, 'normal');
+                        const amountInfo = paymentData?.maxAmountRequired || data.price || '0';
+                        addLine(`Amount:          ${amountInfo} SOL`, 'normal');
                         addLine('───────────────────────────────────────────', 'normal');
                         if (data.autoSettleAt) {
                             const settleDate = new Date(data.autoSettleAt);
@@ -296,9 +340,12 @@ export default function TerminalDemo() {
                 setCurrentStep('unlocked');
             } else {
                 addLine(`✗ Payment failed: HTTP ${res.status}`, 'error');
+                const errText = await res.text().catch(() => '');
+                if (errText) addLine(`  ${errText}`, 'error');
                 setCurrentStep('error');
             }
         } catch (e: any) {
+            console.error(e);
             addLine(`✗ Error: ${e.message}`, 'error');
             setCurrentStep('error');
         } finally {
@@ -323,70 +370,23 @@ export default function TerminalDemo() {
         setCurrentStep('depositing');
         setIsLoading(true);
 
-        addLine(`💳 Depositing ${amount} SOL...`, 'info');
+        addLine(`💳 Depositing ${amount} SOL via ShadowWire SDK...`, 'info');
         addLine('', 'normal');
 
         try {
-            // Convert SOL to lamports
-            const lamports = Math.floor(amount * 1_000_000_000);
+            // Use SDK helper
+            const network = depositNetwork; // 'mainnet' | 'devnet'
 
-            // Determine API URL based on network
-            const apiUrl = depositNetwork === 'devnet'
-                ? 'https://shadow.radr.fun/shadowpay/api/escrow/deposit'
-                : 'https://shadow.radr.fun/shadowpay/api/escrow/deposit';
+            addLine(`📡 Requesting deposit transaction (${network})...`, 'info');
 
-            // Format network like gateway controller does
-            const networkParam = depositNetwork === 'devnet' ? 'solana-devnet' : 'solana-mainnet';
+            const result = await depositToPool(connection, wallet, amount, network);
 
-            addLine(`📡 Requesting deposit transaction (${networkParam})...`, 'info');
-
-            // Call ShadowPay escrow deposit API
-            const res = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    wallet_address: publicKey.toBase58(),
-                    amount: lamports,
-                    network: networkParam, // Pass network in solana-devnet/solana-mainnet format
-                }),
-            });
-
-            if (!res.ok) {
-                const error = await res.json().catch(() => ({}));
-                throw new Error(error.error || `HTTP ${res.status}`);
-            }
-
-            const data = await res.json();
-            addLine('✓ Transaction received', 'success');
-
-            // Decode and sign the transaction
-            addLine('🔐 Please sign the transaction in your wallet...', 'info');
-
-            const txBuffer = Buffer.from(data.transaction, 'base64');
-            const tx = Transaction.from(txBuffer);
-            tx.recentBlockhash = data.recent_blockhash;
-            tx.feePayer = publicKey;
-
-            const signedTx = await signTransaction(tx);
-            addLine('✓ Transaction signed', 'success');
-
-            // Submit to Solana
-            addLine('📤 Submitting to Solana network...', 'info');
-            const signature = await connection.sendRawTransaction(signedTx.serialize());
-
-            addLine(`✓ Transaction submitted: ${signature.slice(0, 8)}...`, 'success');
+            addLine(`✓ Transaction submitted: ${result.signature.slice(0, 8)}...`, 'success');
             addLine('', 'normal');
-            addLine('⏳ Waiting for confirmation...', 'info');
 
-            // Wait for confirmation
-            await connection.confirmTransaction(signature, 'confirmed');
-
-            addLine('', 'normal');
             addLine(`✓ Deposit successful!`, 'success');
-            addLine(`  Amount: ${amount} SOL`, 'info');
-            addLine(`  TX: ${signature}`, 'info');
+            addLine(`  Amount: ${result.amount} SOL`, 'info');
+            addLine(`  TX: ${result.signature}`, 'info');
             addLine('', 'normal');
             addLine('Your escrow is now funded for ZK payments!', 'success');
             addLine('', 'normal');
@@ -394,6 +394,7 @@ export default function TerminalDemo() {
             setCurrentStep('unlocked');
 
         } catch (e: any) {
+            console.error(e);
             addLine(`✗ Error: ${e.message}`, 'error');
             addLine('', 'normal');
             addLine('Press Enter to return to menu...', 'prompt');

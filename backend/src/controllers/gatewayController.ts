@@ -76,8 +76,9 @@ export const accessResource = async (req: Request, res: Response) => {
 
         try {
             // First, try to verify as a JWT access token (from ShadowPay SDK)
-            // JWT tokens start with "eyJ"
-            if (paymentHeaderRaw.startsWith('eyJ')) {
+            // JWT tokens start with "eyJ" AND contain dots (header.payload.signature)
+            // Base64 encoded JSON (ZK proofs) also start with "eyJ" typically ("{...") but don't have dots
+            if (paymentHeaderRaw.startsWith('eyJ') && paymentHeaderRaw.includes('.')) {
                 console.log('Detected JWT access token, verifying with ShadowPay API...');
                 const verifyResponse = await fetch('https://shadow.radr.fun/shadowpay/v1/payment/verify-access', {
                     method: 'GET',
@@ -111,11 +112,39 @@ export const accessResource = async (req: Request, res: Response) => {
                     });
                 }
 
-                // Verify ZK proof with SDK
-                isValid = await sp.verifyPayment(paymentHeaderRaw, {
-                    amount: Number(priceSol),
-                    token: resource.token === 'NATIVE' ? 'SOL' : resource.token,
+                // Verify ZK proof manually to ensure correct payTo recipient
+                // The SDK defaults payTo = apiKey, but we need payTo = FACILITATOR_WALLET
+                const apiUrl = process.env.SHADOWPAY_API_URL || 'https://shadow.radr.fun/shadowpay';
+                const apiKey = process.env.SHADOWPAY_API_KEY;
+
+                console.log(`Verifying proof for recipient: ${FACILITATOR_WALLET}`);
+
+                const verifyRes = await fetch(`${apiUrl}/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        x402Version: 1,
+                        paymentHeader: paymentHeaderRaw,
+                        paymentRequirements: {
+                            scheme: 'zkproof',
+                            network: resource.network === 'MAINNET' ? 'solana-mainnet' : 'solana-devnet',
+                            maxAmountRequired: priceSol,
+                            payTo: FACILITATOR_WALLET // Explicitly match the proof's recipient
+                        }
+                    })
                 });
+
+                if (verifyRes.ok) {
+                    const vData = await verifyRes.json();
+                    console.log('Verification response:', vData);
+                    isValid = vData.isValid;
+                } else {
+                    console.error('Manual verification HTTP error:', await verifyRes.text());
+                    isValid = false;
+                }
                 agentId = 'shadow-agent';
             }
         } catch (error: any) {
