@@ -93,16 +93,39 @@ export const depositToPool = async (
 };
 
 /**
+ * Result from ShadowWire payment including all data needed for x402 header
+ */
+export interface ShadowWirePaymentResult {
+    success: boolean;
+    tx_signature: string;
+    transfer_id: string;
+    sender: string;
+    recipient: string;
+    amount: number; // in lamports
+    token: string;
+    amount_hidden: boolean;
+    proof: {
+        proofBytes: string;
+        commitmentBytes: string;
+        blindingFactorBytes?: string;
+    };
+}
+
+/**
  * Helper to perform an internal transfer (payment)
  * @param wallet Wallet adapter (needs signMessage)
- * @param recipient Recipient address (merchant wallet usually)
+ * @param recipient Recipient address (facilitator wallet)
  * @param amount Amount in SOL
+ * @param token Token symbol
+ * @param resource Resource URL (optional, for tracking)
  */
 export const payWithShadowWire = async (
     wallet: any,
     recipient: string,
-    amount: number
-) => {
+    amount: number,
+    token: string = 'SOL',
+    resource?: string
+): Promise<ShadowWirePaymentResult> => {
     if (!wallet.publicKey || !wallet.signMessage) {
         throw new Error('Wallet does not support message signing');
     }
@@ -116,17 +139,48 @@ export const payWithShadowWire = async (
         }
     }
 
-    // Transfer using SDK
-    return await shadowWire.transfer({
+    // We treat 'NATIVE' as 'SOL' for the SDK
+    const sdkToken = (token === 'NATIVE' ? 'SOL' : token) as any;
+
+    // Generate proof (SDK handles conversion to smallest unit internally for proof gen)
+    const proof = await shadowWire.generateProofLocally(amount, sdkToken);
+
+    // Convert amount to smallest unit (lamports for SOL)
+    const amountLamports = Math.floor(amount * 1_000_000_000);
+
+    // Generate a nonce (random integer)
+    const nonce = Math.floor(Math.random() * 2147483647);
+    const transferId = `zkint_${nonce}`;
+
+    // Execute Transfer
+    const result = await shadowWire.internalTransfer({
+        sender_wallet: wallet.publicKey.toBase58(),
+        recipient_wallet: recipient,
+        token: sdkToken,
+        nonce: nonce,
+        amount: amountLamports,
+        proof_bytes: proof.proofBytes,
+        commitment: proof.commitmentBytes,
+    }, {
+        signMessage: wallet.signMessage
+    });
+
+    // Return complete payment data for x402 header construction
+    return {
+        success: result.success,
+        tx_signature: result.tx_signature || '',
+        transfer_id: result.transfer_id || transferId,
         sender: wallet.publicKey.toBase58(),
         recipient: recipient,
-        amount: amount, // Human readable SOL
-        token: 'SOL',
-        type: 'internal',
-        wallet: {
-            signMessage: wallet.signMessage
+        amount: amountLamports,
+        token: sdkToken,
+        amount_hidden: result.amount_hidden || true,
+        proof: {
+            proofBytes: proof.proofBytes,
+            commitmentBytes: proof.commitmentBytes,
+            blindingFactorBytes: proof.blindingFactorBytes
         }
-    });
+    };
 };
 
 /**

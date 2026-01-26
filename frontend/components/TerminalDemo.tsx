@@ -4,10 +4,15 @@ import { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { Transaction, TransactionInstruction } from '@solana/web3.js';
-import { ShadowPay } from '@shadowpay/client';
 import { depositToPool, getPoolBalance, payWithShadowWire } from '../lib/shadowWire';
 
-type Step = 'welcome' | 'menu' | 'url-input' | 'fetching' | 'payment' | 'unlocked' | 'error' | 'deposit-network' | 'deposit-input' | 'depositing';
+
+type Step = 'welcome' | 'menu' | 'url-input' | 'fetching' | 'payment' | 'unlocked' | 'settle-prompt' | 'dispute-reason' | 'error' | 'deposit-network' | 'deposit-input' | 'depositing';
+
+// ... (rest of imports/interfaces)
+
+
+
 
 interface TerminalLine {
     text: string;
@@ -216,26 +221,65 @@ export default function TerminalDemo() {
         addLine('Generating ZK Proof & Signing...', 'info');
 
         try {
-            // Map "NATIVE" token to "SOL" for SDK
-            // We use the same amount logic as before
+            // The backend now maps "NATIVE" -> "SOL" in the requirements, so we can use the token from the response directly.
+            // If it's missing, default to 'SOL'.
+            const requiredToken = paymentData.extra?.token || 'SOL';
+
             const amount = Number(paymentData.maxAmountRequired);
 
-            // Execute payment using ShadowWire SDK helper
-            // This generates the ZK proof and submits the transaction/proof to the relay
+            // Execute payment using ShadowWire SDK (transfers funds to facilitator)
             const paymentResult = await payWithShadowWire(
                 wallet,
-                paymentData.payTo,
-                amount
+                paymentData.payTo, // Facilitator wallet from 402 response
+                amount,
+                requiredToken,
+                paymentData.resource
             );
 
             addLine('✓ Payment Proof Generated', 'success');
-            addLine(`  TX: ${paymentResult.tx_signature?.slice(0, 8)}...`, 'info');
+            addLine('', 'normal');
+
+            // Parse and display transaction signatures for verification
+            // ShadowWire returns composite signature like "TX1:xxx TX2:yyy"
+            const txSig = paymentResult.tx_signature || '';
+            if (txSig.includes('TX1:')) {
+                const parts = txSig.split(' ');
+                for (const part of parts) {
+                    if (part.startsWith('TX1:')) {
+                        const sig = part.replace('TX1:', '');
+                        addLine(`  TX1 (Escrow):   ${sig.slice(0, 12)}...${sig.slice(-8)}`, 'info');
+                    } else if (part.startsWith('TX2:')) {
+                        const sig = part.replace('TX2:', '');
+                        addLine(`  TX2 (Transfer): ${sig.slice(0, 12)}...${sig.slice(-8)}`, 'info');
+                    }
+                }
+            } else if (txSig) {
+                addLine(`  TX: ${txSig.slice(0, 12)}...${txSig.slice(-8)}`, 'info');
+            }
+
+            addLine(`  Transfer ID: ${paymentResult.transfer_id}`, 'info');
+            addLine(`  Amount: ${(paymentResult.amount / 1e9).toFixed(6)} SOL (hidden on-chain)`, 'info');
             addLine('', 'normal');
             addLine('Accessing resource...', 'info');
 
-            // The backend expects a JSON object (parsed from Base64 or raw).
-            // We verify specific fields in the backend, so we send the full result object.
-            const paymentPayload = JSON.stringify(paymentResult);
+            // Construct X-Payment header with new ShadowWire format
+            // This format contains tx_signature for on-chain verification
+            const payloadObj = {
+                version: 1,
+                scheme: 'shadowwire',
+                payload: {
+                    tx_signature: paymentResult.tx_signature,
+                    transfer_id: paymentResult.transfer_id,
+                    sender: paymentResult.sender,
+                    recipient: paymentResult.recipient,
+                    amount: paymentResult.amount, // in lamports
+                    token: paymentResult.token,
+                    timestamp: Date.now(),
+                    proof: paymentResult.proof
+                }
+            };
+
+            const paymentPayload = JSON.stringify(payloadObj);
             const paymentHeader = btoa(paymentPayload);
 
             const res = await fetch(currentInput, {
@@ -286,6 +330,20 @@ export default function TerminalDemo() {
                         const amountInfo = paymentData?.maxAmountRequired || '0';
                         addLine(`Amount:          ${amountInfo} SOL`, 'normal');
                         addLine('───────────────────────────────────────────', 'normal');
+
+                        // Add transaction verification info
+                        const txSig = paymentResult.tx_signature || '';
+                        if (txSig.includes('TX2:')) {
+                            const tx2Match = txSig.match(/TX2:(\S+)/);
+                            if (tx2Match) {
+                                const tx2Sig = tx2Match[1];
+                                addLine(`Transfer TX:     ${tx2Sig.slice(0, 8)}...${tx2Sig.slice(-6)}`, 'info');
+                                addLine(`Verify at:       solana.fm/tx/${tx2Sig.slice(0, 20)}...`, 'normal');
+                            }
+                        }
+                        addLine(`Transfer ID:     ${paymentResult.transfer_id}`, 'normal');
+                        addLine('───────────────────────────────────────────', 'normal');
+
                         if (autoSettleAt) {
                             const settleDate = new Date(autoSettleAt);
                             addLine(`Auto-Approval:   ${settleDate.toLocaleTimeString()}`, 'info');
@@ -309,6 +367,20 @@ export default function TerminalDemo() {
                         const amountInfo = paymentData?.maxAmountRequired || data.price || '0';
                         addLine(`Amount:          ${amountInfo} SOL`, 'normal');
                         addLine('───────────────────────────────────────────', 'normal');
+
+                        // Add transaction verification info
+                        const txSig = paymentResult.tx_signature || '';
+                        if (txSig.includes('TX2:')) {
+                            const tx2Match = txSig.match(/TX2:(\S+)/);
+                            if (tx2Match) {
+                                const tx2Sig = tx2Match[1];
+                                addLine(`Transfer TX:     ${tx2Sig.slice(0, 8)}...${tx2Sig.slice(-6)}`, 'info');
+                                addLine(`Verify at:       solana.fm/tx/${tx2Sig.slice(0, 20)}...`, 'normal');
+                            }
+                        }
+                        addLine(`Transfer ID:     ${paymentResult.transfer_id}`, 'normal');
+                        addLine('───────────────────────────────────────────', 'normal');
+
                         if (data.autoSettleAt) {
                             const settleDate = new Date(data.autoSettleAt);
                             const minutesLeft = Math.round((settleDate.getTime() - Date.now()) / 60000);
@@ -404,6 +476,55 @@ export default function TerminalDemo() {
         }
     };
 
+    // Helper to settle transaction
+    const settleTransaction = async (status: 'SETTLED' | 'DISPUTED', reason?: string) => {
+        if (!unlockedContent?.receiptCode) return;
+
+        // Find transaction ID from previous response headers (stored in unlockedContent or we need to extract it)
+        // Since we didn't store txId explicitly in state, let's assume the backend response includes it.
+        // Wait, the backend accessResource returns { transactionId, ... }. 
+        // Let's ensure we stored it.
+
+        const txId = unlockedContent.transactionId;
+        if (!txId) {
+            addLine('✗ Cannot settle: Missing Transaction ID', 'error');
+            return;
+        }
+
+        setIsLoading(true);
+        addLine(status === 'SETTLED' ? 'Confirming receipt...' : 'Submitting dispute...', 'info');
+
+        try {
+            const res = await fetch('/api/gateway/settle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    transactionId: txId,
+                    status,
+                    reason
+                })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                addLine(`✓ ${data.message}`, 'success');
+                if (status === 'DISPUTED') {
+                    addLine('  Support will review your case.', 'info');
+                }
+            } else {
+                addLine(`✗ Settlement failed: ${data.error}`, 'error');
+            }
+        } catch (e: any) {
+            addLine(`✗ Error: ${e.message}`, 'error');
+        } finally {
+            setIsLoading(false);
+            addLine('', 'normal');
+            addLine('Press Enter to return to menu...', 'prompt');
+            setCurrentStep('unlocked'); // Go back to final state wait
+        }
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         // Global shortcuts
         // Ctrl+C - Clear/Reset at any step
@@ -493,13 +614,18 @@ export default function TerminalDemo() {
             if (e.key === 'Enter' && !isLoading) {
                 handlePayment();
             }
-        } else if (['unlocked', 'error'].includes(currentStep)) {
+        } else if (currentStep === 'unlocked') {
             if (e.key === 'Enter') {
-                clearTerminal();
-                setCurrentStep('menu');
+                // Default action: Settle (Confirm receipt)
+                settleTransaction('SETTLED');
+            } else if (e.key === 'd' || e.key === 'D') {
+                // Dispute action
+                setCurrentStep('dispute-reason');
                 setCurrentInput('');
-                setPaymentData(null);
-                setUnlockedContent(null);
+            }
+        } else if (currentStep === 'dispute-reason') {
+            if (e.key === 'Enter' && currentInput.trim()) {
+                settleTransaction('DISPUTED', currentInput);
             }
         }
     };
@@ -596,7 +722,7 @@ export default function TerminalDemo() {
                             </div>
                         )}
 
-                        {(currentStep === 'url-input' || currentStep === 'fetching' || currentStep === 'payment' || currentStep === 'unlocked' || currentStep === 'error' || currentStep === 'deposit-input' || currentStep === 'depositing') && (
+                        {(currentStep === 'url-input' || currentStep === 'fetching' || currentStep === 'payment' || currentStep === 'unlocked' || currentStep === 'error' || currentStep === 'deposit-input' || currentStep === 'depositing' || currentStep === 'dispute-reason') && (
                             <div>
                                 {terminalHistory.map((line, i) => (
                                     <div
@@ -624,6 +750,24 @@ export default function TerminalDemo() {
                                             placeholder="https://..."
                                             autoFocus
                                         />
+                                    </div>
+                                )}
+
+                                {currentStep === 'dispute-reason' && (
+                                    <div className="mt-4">
+                                        <p className="text-[#FF5832] mb-2">Why are you disputing this transaction?</p>
+                                        <div className="flex items-center">
+                                            <span className="text-[#FF8E40] mr-2">&gt;</span>
+                                            <input
+                                                ref={inputRef}
+                                                type="text"
+                                                value={currentInput}
+                                                onChange={(e) => setCurrentInput(e.target.value)}
+                                                className="flex-1 bg-transparent text-white outline-none border-none"
+                                                placeholder="Describe the issue..."
+                                                autoFocus
+                                            />
+                                        </div>
                                     </div>
                                 )}
 
@@ -704,7 +848,9 @@ export default function TerminalDemo() {
                                             </div>
                                         )}
 
-                                        <p className="text-[#FF8E40] mt-4">Press Enter to return to menu...</p>
+                                        {!unlockedContent.receiptCode && (
+                                            <p className="text-[#FF8E40] mt-4">Press Enter to return to menu...</p>
+                                        )}
                                     </div>
                                 )}
                             </div>

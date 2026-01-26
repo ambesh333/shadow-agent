@@ -17,7 +17,8 @@ import gatewayRoutes from './routes/gatewayRoutes';
 
 app.use(cors({
     origin: 'http://localhost:3000',
-    credentials: true
+    credentials: true,
+    exposedHeaders: ['X-Receipt-Code', 'X-Auto-Settle-At', 'X-Merchant-Name', 'X-Transaction-ID']
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' })); // Increased for base64 images

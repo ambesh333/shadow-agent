@@ -95,6 +95,9 @@ model Transaction {
   encryptedDisputeReason String?
   merchantPubKey         String?   // For dispute message encryption
   
+  // Storage for Settlement
+  paymentHeader          String?   @db.Text
+
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
