@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { prisma } from '../context';
+import { prisma, shadowPay } from '../context';
 import crypto from 'crypto';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
@@ -179,8 +179,57 @@ export const verifySignature = async (req: Request, res: Response) => {
     }
 };
 
-// POST /api/auth/logout - Clear session
+// GET /api/auth/logout - Clear session
 export const logout = async (req: Request, res: Response) => {
     res.clearCookie('session_token');
     return res.json({ success: true });
+};
+
+// GET /api/auth/stats - Get merchant dashboard statistics
+export const getMerchantStats = async (req: Request, res: Response) => {
+    try {
+        const merchantId = (req as any).merchantId;
+
+        if (!merchantId) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+
+        // Fetch funds in escrow (PENDING and DELIVERED transactions)
+        // These are confirmed payments held by facilitator but not yet settled/paid out
+        const pendingTransactions = await prisma.transaction.findMany({
+            where: {
+                merchantId,
+                status: { in: ['PENDING', 'DELIVERED'] }
+            },
+            select: { amount: true }
+        });
+        const escrowBalance = pendingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+        // Fetch active disputes (REFUND_REQUESTED transactions)
+        const activeDisputes = await prisma.transaction.count({
+            where: {
+                merchantId,
+                status: 'REFUND_REQUESTED'
+            }
+        });
+
+        // Fetch total settled sales
+        const settledTransactions = await prisma.transaction.findMany({
+            where: {
+                merchantId,
+                status: 'SETTLED'
+            },
+            select: { amount: true }
+        });
+        const totalSales = settledTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+        return res.json({
+            escrowBalance,
+            activeDisputes,
+            totalSales
+        });
+    } catch (error) {
+        console.error('Stats fetch error:', error);
+        return res.status(500).json({ error: 'Failed to fetch statistics' });
+    }
 };

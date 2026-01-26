@@ -8,14 +8,32 @@ export default function DashboardPage() {
         totalSales: 0
     });
 
-    // Mock data fetch
     useEffect(() => {
-        // In a real app, fetch from backend via /api/auth/me or statistics endpoint
-        setStats({
-            escrowBalance: 250.00,
-            activeDisputes: 1,
-            totalSales: 1250.00
-        });
+        const fetchStats = async () => {
+            try {
+                const response = await fetch('http://localhost:3001/api/auth/stats', {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include', // Send cookies
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    setStats({
+                        escrowBalance: data.escrowBalance || 0,
+                        activeDisputes: data.activeDisputes || 0,
+                        totalSales: data.totalSales || 0
+                    });
+                } else {
+                    console.error('Failed to fetch stats:', await response.text());
+                }
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
+        };
+
+        fetchStats();
     }, []);
 
     return (
@@ -31,7 +49,7 @@ export default function DashboardPage() {
                     <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Funds in Escrow</h3>
                     <div className="flex items-baseline gap-1">
                         <span className="text-4xl font-mono font-bold text-[#FFB657]">$</span>
-                        <span className="text-4xl font-mono font-bold text-white">{stats.escrowBalance.toFixed(2)}</span>
+                        <span className="text-4xl font-mono font-bold text-white">{stats.escrowBalance.toFixed(5)}</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 mt-4 rounded-full overflow-hidden">
                         <div className="bg-[#FFB657] h-full w-[45%]" />
@@ -57,7 +75,7 @@ export default function DashboardPage() {
                     <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Total Sales (Settled)</h3>
                     <div className="flex items-baseline gap-1">
                         <span className="text-4xl font-mono font-bold text-[#FF8E40]">$</span>
-                        <span className="text-4xl font-mono font-bold text-white">{stats.totalSales.toFixed(2)}</span>
+                        <span className="text-4xl font-mono font-bold text-white">{stats.totalSales.toFixed(4)}</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 mt-4 rounded-full overflow-hidden">
                         <div className="bg-[#FF8E40] h-full w-[75%]" />

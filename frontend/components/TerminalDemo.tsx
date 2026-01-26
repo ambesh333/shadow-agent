@@ -320,6 +320,9 @@ export default function TerminalDemo() {
                     addLine(`  Size: ${(blob.size / 1024).toFixed(1)} KB`, 'info');
                     addLine('', 'normal');
 
+                    // Get transaction ID from headers
+                    const transactionId = res.headers.get('X-Transaction-ID');
+
                     // Display receipt
                     if (receiptCode) {
                         addLine('═══════════════════════════════════════════', 'normal');
@@ -346,12 +349,22 @@ export default function TerminalDemo() {
 
                         if (autoSettleAt) {
                             const settleDate = new Date(autoSettleAt);
-                            addLine(`Auto-Approval:   ${settleDate.toLocaleTimeString()}`, 'info');
+                            const minutesLeft = Math.round((settleDate.getTime() - Date.now()) / 60000);
+                            addLine(`Auto-Approval:   ${minutesLeft} minutes`, 'info');
+                            addLine(`Expires At:      ${settleDate.toLocaleTimeString()}`, 'normal');
                         }
+                        addLine('───────────────────────────────────────────', 'normal');
+                        addLine('[Enter] Confirm OK  |  [D] Dispute', 'prompt');
                         addLine('═══════════════════════════════════════════', 'normal');
                     }
 
-                    setUnlockedContent({ type: 'image', filename, size: blob.size, receiptCode });
+                    setUnlockedContent({
+                        type: 'image',
+                        filename,
+                        size: blob.size,
+                        receiptCode,
+                        transactionId
+                    });
                 } else if (contentType.includes('application/json')) {
                     // JSON response - parse and display
                     const data = await res.json();
@@ -495,7 +508,7 @@ export default function TerminalDemo() {
         addLine(status === 'SETTLED' ? 'Confirming receipt...' : 'Submitting dispute...', 'info');
 
         try {
-            const res = await fetch('/api/gateway/settle', {
+            const res = await fetch('http://localhost:3001/api/gateway/settle', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
