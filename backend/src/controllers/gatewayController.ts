@@ -1,9 +1,14 @@
-import { Request, Response } from 'express';
-import { prisma } from '../context';
+import { request, Request, Response } from 'express';
+import { prisma, shadowPay } from '../context';
 import { Connection } from '@solana/web3.js';
+import { initWASM, generateRangeProof, verifyRangeProof, isWASMSupported, BULLETPROOF_INFO } from '../clients/shadowWireClient';
+import { TokenUtils } from '../clients/tokens';
+import { RecipientNotFoundError } from '../clients/errors';
 
 const FACILITATOR_WALLET = process.env.FACILITATOR_WALLET_ADDRESS;
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const SHADOWPAY_API_URL = process.env.SHADOWPAY_API_URL || 'https://api.shadowpay.com';
+const SHADOWPAY_API_KEY = process.env.SHADOWPAY_API_KEY;
 
 /**
  * Custom Payment Header Format (ShadowWire x402)
@@ -252,10 +257,13 @@ export const accessResource = async (req: Request, res: Response) => {
         // Capture Agent Wallet if provided (for refunds)
         const agentWallet = req.header('X-Agent-Wallet') || 'unknown-agent';
 
+        console.log('Agent Wallet:', agentWallet);
+
         // Store the RAW payment header (proof) for later settlement
         const tx = await prisma.transaction.create({
             data: {
                 merchantId: resource.merchantId,
+                resourceId: resource.id,
                 agentId: agentWallet, // Store wallet address as agentId
                 amount: resource.price,
                 network: resource.network,
@@ -306,6 +314,10 @@ export const accessResource = async (req: Request, res: Response) => {
 /**
  * POST /api/gateway/settle
  * Agent settles or disputes a transaction after receiving the resource
+ * 
+ * NEW LOGIC (SDK-based):
+ * - SETTLED: Transfer from Facilitator escrow to Merchant's wallet (immediate).
+ * - DISPUTED: Keep funds in Facilitator escrow. Mark as REFUND_REQUESTED for Merchant review.
  */
 export const settleTransaction = async (req: Request, res: Response) => {
     try {
@@ -328,73 +340,244 @@ export const settleTransaction = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Transaction already finalized' });
         }
 
-        if (!transaction.paymentHeader) {
-            return res.status(400).json({ error: 'Missing payment proof for settlement' });
-        }
+        console.log(`Processing settlement: Status=${status}, TxId=${transactionId}`);
 
-        // --- SHADOWPAY API INTEGRATION ---
-        const apiUrl = process.env.SHADOWPAY_API_URL || 'https://shadow.radr.fun/shadowpay';
+        if (status === 'SETTLED') {
+            // --- Agent confirmed receipt: Transfer to Merchant ---
+            const merchantWallet = transaction.merchant.walletAddress;
+            const amountSOL = transaction.amount;
 
-        // Determine recipient: Merchant (if Settled) or Agent (if Disputed/Refund)
-        const recipient = status === 'SETTLED' ? transaction.merchant.walletAddress : transaction.agentId;
+            console.log(`API Transfer: Facilitator(${FACILITATOR_WALLET}) -> Merchant (${merchantWallet})`);
+            console.log(`Amount: ${amountSOL} SOL`);
 
-        console.log(`Executing Settlement... Status: ${status}, Recipient: ${recipient}`);
+            const amountSmallestUnit = TokenUtils.toSmallestUnit(amountSOL, 'SOL');
+            const nonce = Math.floor(Date.now() / 1000);
 
-        const settleResponse = await fetch(`${apiUrl}/settle`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                x402Version: 1,
-                paymentHeader: transaction.paymentHeader, // Re-use stored proof
-                paymentRequirements: {
-                    scheme: 'zkproof',
-                    network: transaction.network === 'MAINNET' ? 'solana-mainnet' : 'solana-devnet',
-                    maxAmountRequired: transaction.amount.toString(),
-                    resource: transaction.dataPayload || 'unknown-resource', // Resource URL/ID
-                    description: `Settlement for ${transaction.id}`,
-                    mimeType: 'application/json',
-                    payTo: recipient, // <--- DYNAMIC RECIPIENT
-                    maxTimeoutSeconds: 300,
-                    extra: null
-                },
-                // Optional metadata if needed by SDK
-                metadata: {
-                    serviceAuth: process.env.SHADOWPAY_API_KEY // key to authorize spending if needed
+            try {
+                const proof = await generateRangeProof(amountSmallestUnit, 64);
+
+                const requestData = {
+                    sender_wallet: FACILITATOR_WALLET || '',
+                    recipient_wallet: merchantWallet,
+                    token: 'SOL',
+                    nonce: nonce,
+                    amount: amountSOL,
+                    proof_bytes: proof.proofBytes || '',
+                    commitment: proof.commitmentBytes || '',
+                };
+
+                // Helper to perform the transfer request
+                const performTransfer = async (isInternal: boolean) => {
+                    const endpoint = isInternal ? 'internal-transfer' : 'external-transfer';
+                    const response = await fetch(`${SHADOWPAY_API_URL}/zk/${endpoint}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${SHADOWPAY_API_KEY}`,
+                        },
+                        body: JSON.stringify(requestData),
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.error || `ShadowPay API error: ${response.statusText}`);
+                    }
+
+                    return await response.json();
+                };
+
+                let apiResult;
+                try {
+                    // Try internal transfer first
+                    apiResult = await performTransfer(true);
+                } catch (error: any) {
+                    // If recipient not found, try external transfer
+                    if (error.message.includes('Recipient not found') || error.message.includes('404')) {
+                        console.log('Recipient not found internally, attempting external transfer...');
+                        apiResult = await performTransfer(false);
+                    } else {
+                        throw error;
+                    }
                 }
-            })
-        });
 
-        if (!settleResponse.ok) {
-            const errText = await settleResponse.text();
-            console.error('ShadowPay Settlement Failed:', errText);
+                console.log('ShadowPay Transfer Success:', apiResult);
 
-            // If the API fails, we probably shouldn't update our DB status?
-            // Or we mark it as 'ERROR_SETTLING'.
-            // For now, let's return error to frontend.
-            return res.status(502).json({ error: 'Upstream Settlement Failed', details: errText });
+                // Update transaction status in DB
+                const updatedTx = await prisma.transaction.update({
+                    where: { id: transactionId },
+                    data: {
+                        status: 'SETTLED',
+                    }
+                });
+
+                console.log(`Transaction ${transactionId} marked as SETTLED`);
+
+                return res.json({
+                    success: true,
+                    status: updatedTx.status,
+                    txSignature: apiResult.tx_signature || 'pending',
+                    message: 'Funds released to merchant via ShadowPay'
+                });
+
+            } catch (error: any) {
+                console.error('ShadowPay Transfer Failed:', error.message);
+                return res.status(502).json({
+                    error: 'Settlement transfer failed',
+                    details: error.message
+                });
+            }
+
+        } else {
+            // --- Agent disputes: Keep funds in escrow, await Merchant decision ---
+            const updatedTx = await prisma.transaction.update({
+                where: { id: transactionId },
+                data: {
+                    status: 'REFUND_REQUESTED',
+                    encryptedDisputeReason: reason || null
+                }
+            });
+
+            console.log(`Transaction ${transactionId} marked as REFUND_REQUESTED`);
+
+            return res.json({
+                success: true,
+                status: updatedTx.status,
+                message: 'Dispute recorded. Awaiting merchant review.'
+            });
         }
 
-        const settleData = await settleResponse.json();
-        console.log('ShadowPay Settlement Success:', settleData);
-        // ---------------------------------
-
-        const updatedTx = await prisma.transaction.update({
-            where: { id: transactionId },
-            data: {
-                status: status,
-                encryptedDisputeReason: reason || null,
-            }
-        });
-
-        console.log(`Transaction ${transactionId} marked as ${status}`);
-
-        return res.json({
-            success: true,
-            status: updatedTx.status,
-            message: status === 'SETTLED' ? 'Funds released to merchant' : 'Funds refunded to agent'
-        });
     } catch (error) {
         console.error('Settlement error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+
+};
+
+/**
+ * POST /api/gateway/resolve-dispute
+ * Merchant resolves a disputed transaction
+ * 
+ * - REFUND: Transfer from Facilitator escrow to Agent's wallet.
+ * - REJECT: Transfer from Facilitator escrow to Merchant's wallet.
+ */
+export const resolveDispute = async (req: Request, res: Response) => {
+    try {
+        const { transactionId, decision } = req.body;
+        const merchantId = (req as any).merchantId; // From auth middleware
+
+        if (!transactionId || !['REFUND', 'REJECT'].includes(decision)) {
+            return res.status(400).json({ error: 'Invalid resolve request' });
+        }
+
+        const transaction = await prisma.transaction.findUnique({
+            where: { id: transactionId },
+            include: { merchant: true }
+        });
+
+        if (!transaction) {
+            return res.status(404).json({ error: 'Transaction not found' });
+        }
+
+        // Verify merchant owns this transaction
+        if (transaction.merchantId !== merchantId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        if (transaction.status !== 'REFUND_REQUESTED') {
+            return res.status(400).json({ error: 'Transaction is not in dispute' });
+        }
+
+        console.log(`Resolving dispute: Decision=${decision}, TxId=${transactionId}`);
+
+        const amountSOL = transaction.amount;
+        const amountSmallestUnit = TokenUtils.toSmallestUnit(amountSOL, 'SOL');
+        const nonce = Math.floor(Date.now() / 1000);
+
+        // Determine recipient based on decision
+        // For REFUND, it goes back to the Agent. For REJECT, it goes to the Merchant.
+        const recipientWallet = decision === 'REFUND'
+            ? transaction.agentId
+            : transaction.merchant.walletAddress;
+
+        console.log(`API Transfer (${decision}): Facilitator -> ${decision === 'REFUND' ? 'Agent' : 'Merchant'} (${recipientWallet})`);
+        console.log(`Amount: ${amountSOL} SOL`);
+
+        try {
+            const proof = await generateRangeProof(amountSmallestUnit, 64);
+
+            const requestData = {
+                sender_wallet: FACILITATOR_WALLET || '',
+                recipient_wallet: recipientWallet,
+                token: 'SOL',
+                nonce: nonce,
+                amount: amountSOL,
+                proof_bytes: proof.proofBytes || '',
+                commitment: proof.commitmentBytes || '',
+            };
+
+            const performTransfer = async (isInternal: boolean) => {
+                const endpoint = isInternal ? 'internal-transfer' : 'external-transfer';
+                const response = await fetch(`${SHADOWPAY_API_URL}/zk/${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SHADOWPAY_API_KEY}`,
+                    },
+                    body: JSON.stringify(requestData),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `ShadowPay API error: ${response.statusText}`);
+                }
+
+                return await response.json();
+            };
+
+            let apiResult;
+            try {
+                // Try internal transfer first
+                apiResult = await performTransfer(true);
+            } catch (error: any) {
+                // If recipient not found, try external transfer
+                if (error.message.includes('Recipient not found') || error.message.includes('404')) {
+                    console.log('Recipient not found internally, attempting external transfer...');
+                    apiResult = await performTransfer(false);
+                } else {
+                    throw error;
+                }
+            }
+
+            console.log(`ShadowPay ${decision} Transfer Success:`, apiResult);
+
+            // Update transaction status in DB
+            const finalStatus = decision === 'REFUND' ? 'REFUNDED' : 'SETTLED';
+            const updatedTx = await prisma.transaction.update({
+                where: { id: transactionId },
+                data: { status: finalStatus }
+            });
+
+            console.log(`Transaction ${transactionId} marked as ${finalStatus}`);
+
+            return res.json({
+                success: true,
+                status: updatedTx.status,
+                txSignature: apiResult.tx_signature || 'pending',
+                message: decision === 'REFUND'
+                    ? 'Refund processed. Funds returned to agent.'
+                    : 'Claim rejected. Funds released to merchant.'
+            });
+
+        } catch (error: any) {
+            console.error(`ShadowPay ${decision} Transfer Failed:`, error.message);
+            return res.status(502).json({
+                error: `${decision} transfer failed`,
+                details: error.message
+            });
+        }
+
+    } catch (error) {
+        console.error('Dispute resolution error:', error);
         return res.status(500).json({ error: 'Internal server error' });
     }
 };

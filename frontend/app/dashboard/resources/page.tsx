@@ -147,7 +147,7 @@ function ResourceCard({ resource, onDelete }: { resource: Resource; onDelete: (i
                         {copied ? <Check size={12} /> : <Copy size={12} />}
                     </button>
                     <Link
-                        href={`/demo/x402?url=${encodeURIComponent(`http://localhost:3001/api/gateway/resource/${resource.id}`)}`}
+                        href={`/dashboard/demo?url=${encodeURIComponent(`http://localhost:3001/api/gateway/resource/${resource.id}`)}`}
                         className="p-1.5 text-gray-500 hover:text-[#FF8E40] hover:bg-white/10 rounded transition-colors"
                         title="Open Simulator"
                     >

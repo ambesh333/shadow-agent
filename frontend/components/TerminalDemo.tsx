@@ -638,7 +638,9 @@ export default function TerminalDemo() {
             }
         } else if (currentStep === 'dispute-reason') {
             if (e.key === 'Enter' && currentInput.trim()) {
-                settleTransaction('DISPUTED', currentInput);
+                // "Encrypt" the reason before sending (matching frontend's decryption)
+                const encryptedReason = btoa(currentInput);
+                settleTransaction('DISPUTED', encryptedReason);
             }
         }
     };
@@ -828,16 +830,21 @@ export default function TerminalDemo() {
                                             </div>
                                         )}
 
-                                        {/* Link content */}
-                                        {unlockedContent.type === 'link' && (
+                                        {/* Link content (supports both frontend 'link' and backend 'LINK'/'VIDEO' types) */}
+                                        {(unlockedContent.type === 'link' || unlockedContent.type === 'LINK' || unlockedContent.type === 'VIDEO') && (
                                             <div className="bg-white/5 border border-white/10 rounded p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="text-xs font-bold bg-[#FF8E40]/20 text-[#FF8E40] px-2 py-0.5 rounded">
+                                                        {unlockedContent.type.toUpperCase()}
+                                                    </span>
+                                                </div>
                                                 <a
-                                                    href={unlockedContent.url}
+                                                    href={unlockedContent.url || unlockedContent.data}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-[#FF8E40] hover:text-[#FFB657] underline break-all"
                                                 >
-                                                    {unlockedContent.url}
+                                                    {unlockedContent.url || unlockedContent.data}
                                                 </a>
                                                 <p className="text-gray-500 text-xs mt-2">Cmd+Click to open</p>
                                             </div>
@@ -852,8 +859,8 @@ export default function TerminalDemo() {
                                             </div>
                                         )}
 
-                                        {/* JSON content (no type field means it's raw JSON) */}
-                                        {!unlockedContent.type && (
+                                        {/* Fallback: JSON content if type is not handled above */}
+                                        {!['image', 'link', 'text', 'LINK', 'VIDEO'].includes(unlockedContent.type) && (
                                             <div className="bg-white/5 border border-white/10 rounded p-4">
                                                 <pre className="text-gray-300 text-xs overflow-x-auto">
                                                     {JSON.stringify(unlockedContent, null, 2)}

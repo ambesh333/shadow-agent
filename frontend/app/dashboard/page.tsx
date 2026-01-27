@@ -5,7 +5,8 @@ export default function DashboardPage() {
     const [stats, setStats] = useState({
         escrowBalance: 0,
         activeDisputes: 0,
-        totalSales: 0
+        totalSales: 0,
+        resourcesAnalytics: []
     });
 
     useEffect(() => {
@@ -23,7 +24,8 @@ export default function DashboardPage() {
                     setStats({
                         escrowBalance: data.escrowBalance || 0,
                         activeDisputes: data.activeDisputes || 0,
-                        totalSales: data.totalSales || 0
+                        totalSales: data.totalSales || 0,
+                        resourcesAnalytics: data.resourcesAnalytics || []
                     });
                 } else {
                     console.error('Failed to fetch stats:', await response.text());
@@ -81,6 +83,62 @@ export default function DashboardPage() {
                         <div className="bg-[#FF8E40] h-full w-[75%]" />
                     </div>
                     <p className="text-xs text-gray-500 mt-2">Paid out to your Shadow Wallet</p>
+                </div>
+            </div>
+
+            {/* Merchant Resources Analytics Table */}
+            <div className="mt-12">
+                <h3 className="text-xl font-bold text-[#F4F4F5] mb-6">Top Performing Resources</h3>
+
+                <div className="space-y-3">
+                    {/* Header Row */}
+                    <div className="grid grid-cols-12 gap-4 px-6 py-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+                        <div className="col-span-1">Rank</div>
+                        <div className="col-span-6">Resource</div>
+                        <div className="col-span-3 text-right">Access Count</div>
+                        <div className="col-span-2 text-right">Disputes</div>
+                    </div>
+
+                    {/* Data Rows */}
+                    {stats.resourcesAnalytics.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500 bg-black/50 rounded-xl border border-white/5">
+                            No analytics data available yet.
+                        </div>
+                    ) : (
+                        stats.resourcesAnalytics.map((resource: any, index: number) => {
+                            // Calculate gradient opacity: Starts at 0.2 (20%) and fades down
+                            const opacity = Math.max(0.02, 0.2 - (index * 0.03));
+
+                            return (
+                                <div
+                                    key={resource.id}
+                                    className="relative grid grid-cols-12 gap-4 items-center px-6 py-4 rounded-xl border border-white/5 overflow-hidden group hover:border-[#FFB657]/30 transition-colors"
+                                >
+                                    {/* Gradient Background Layer */}
+                                    <div
+                                        className="absolute inset-0 bg-gradient-to-r from-[#FF8E40] to-transparent pointer-events-none"
+                                        style={{ opacity: opacity }}
+                                    />
+
+                                    <div className="col-span-1 relative z-10 font-mono text-gray-400">
+                                        #{index + 1}
+                                    </div>
+                                    <div className="col-span-6 relative z-10">
+                                        <div className="font-bold text-[#F4F4F5]">{resource.title}</div>
+                                        <div className="text-xs text-gray-500 uppercase tracking-wider">{resource.type}</div>
+                                    </div>
+                                    <div className="col-span-3 relative z-10 text-right">
+                                        <div className="font-mono text-lg font-bold text-[#FFB657]">{resource.accessCount}</div>
+                                    </div>
+                                    <div className="col-span-2 relative z-10 text-right">
+                                        <div className={`font-mono font-bold ${resource.disputeCount > 0 ? 'text-[#FF5832]' : 'text-gray-600'}`}>
+                                            {resource.disputeCount}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
             </div>
         </div>

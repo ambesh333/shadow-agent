@@ -26,6 +26,31 @@ export class ShadowPayClient {
                 'X-API-Key': apiKey,
             },
         });
+
+        // Debug logging
+        this.client.interceptors.request.use(request => {
+            console.log('[ShadowPayClient] Request:', {
+                method: request.method?.toUpperCase(),
+                url: request.url,
+                baseURL: request.baseURL,
+                apiKeyConfigured: !!request.headers['X-API-Key'],
+                apiKeyPreview: request.headers['X-API-Key'] ? `${(request.headers['X-API-Key'] as string).slice(0, 4)}...` : 'NONE'
+            });
+            return request;
+        });
+
+        this.client.interceptors.response.use(
+            response => response,
+            error => {
+                console.error('[ShadowPayClient] Error:', {
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    data: error.response?.data,
+                    url: error.config?.url
+                });
+                return Promise.reject(error);
+            }
+        );
     }
 
     // --- x402 Protocol Methods ---
@@ -94,6 +119,56 @@ export class ShadowPayClient {
      */
     async refundToAgent(agentAddress: string, amount: number) {
         return this.withdrawFromEscrow(agentAddress, amount);
+    }
+
+    // --- Payment Transfer (using correct API from api.md) ---
+
+    /**
+     * Withdraw from payment account to a wallet.
+     * API: POST /shadowpay/v1/payment/withdraw
+     * 
+     * This transfers funds from the Facilitator's payment account to a recipient wallet.
+     * Used for settlement (to Merchant) or refund (to Agent).
+     * 
+     * @param recipientWallet - The recipient's wallet address (Merchant/Agent)
+     * @param amountLamports - Amount in lamports (1 SOL = 1e9 lamports)
+     */
+    async withdrawToWallet(recipientWallet: string, amountLamports: number) {
+        console.log(`[ShadowPayClient] Payment Withdraw: -> ${recipientWallet}, ${amountLamports} lamports`);
+        console.log(this.client.defaults.headers);
+        const response = await this.client.post('/shadowpay/v1/payment/withdraw', {
+            wallet_address: recipientWallet,
+            amount: amountLamports
+        });
+
+        return response.data;
+    }
+
+    /**
+     * Helper method that converts SOL to lamports and calls withdrawToWallet.
+     * This is the main method to use for settlement/refund transfers.
+     */
+    async transferToWallet(recipientWallet: string, amountSOL: number) {
+        const amountLamports = Math.floor(amountSOL * 1e9);
+        console.log(`[ShadowPayClient] Transfer: ${amountSOL} SOL (${amountLamports} lamports) -> ${recipientWallet}`);
+        return this.withdrawToWallet(recipientWallet, amountLamports);
+    }
+
+    /**
+     * Settle payment with ZK proof (x402 flow step 3).
+     * API: POST /shadowpay/v1/payment/settle
+     */
+    async settlePaymentWithProof(commitment: string, proof: string, publicSignals: string[], encryptedAmount?: number[]) {
+        console.log(`[ShadowPayClient] Settling payment with commitment: ${commitment.slice(0, 20)}...`);
+
+        const response = await this.client.post('/shadowpay/v1/payment/settle', {
+            commitment,
+            proof,
+            public_signals: publicSignals,
+            encrypted_amount: encryptedAmount || null
+        });
+
+        return response.data;
     }
 }
 

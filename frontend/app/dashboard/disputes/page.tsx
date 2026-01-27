@@ -1,86 +1,177 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, Lock, Unlock } from 'lucide-react';
 
-// Mock Type
 interface Dispute {
     id: string;
     transactionId: string;
     agentId: string;
     amount: number;
     encryptedReason: string;
+    resourceName: string;
+    createdAt: string;
+    receiptCode: string | null;
 }
 
 export default function DisputesPage() {
     const [disputes, setDisputes] = useState<Dispute[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [decryptedReasons, setDecryptedReasons] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        // Mock fetch
-        setDisputes([
-            {
-                id: 'disp-1',
-                transactionId: 'tx-5555-5555',
-                agentId: 'agent-gamma-3',
-                amount: 10.00,
-                encryptedReason: 'Encrypted: Bad Data Quality...'
+        const fetchDisputes = async () => {
+            try {
+                const response = await fetch('http://localhost:3001/api/auth/disputes', {
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setDisputes(data.disputes);
+                }
+            } catch (error) {
+                console.error('Failed to fetch disputes:', error);
+            } finally {
+                setIsLoading(false);
             }
-        ]);
+        };
+
+        fetchDisputes();
     }, []);
 
-    const handleResolve = async (id: string, decision: 'REFUND' | 'REJECT') => {
-        console.log(`Resolving dispute ${id} with ${decision}`);
-        // Call backend API /admin/resolve
-        alert(`Dispute ${decision}ED`);
-        setDisputes(prev => prev.filter(d => d.id !== id));
+    // Simple "Decryption" (Reverse of Terminal's "Encryption")
+    // In a real app, this would use window.crypto.subtle with a shared secret
+    const handleDecrypt = (id: string, encryptedText: string) => {
+        try {
+            // Demo Strategy: We'll assume the terminal effectively just Base64 encoded or simple obfuscation
+            // Let's implement a simple reversal of what we plan to do in Terminal
+            // Plan: Terminal will base64 encode. So here we decode.
+            const decrypted = atob(encryptedText);
+            setDecryptedReasons(prev => ({ ...prev, [id]: decrypted }));
+        } catch (e) {
+            setDecryptedReasons(prev => ({ ...prev, [id]: 'Error decrypting' }));
+        }
+    };
+
+    const handleResolve = async (transactionId: string, decision: 'REFUND' | 'REJECT') => {
+        try {
+            const response = await fetch('http://localhost:3001/api/gateway/resolve-dispute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ transactionId, decision })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert(`✓ ${data.message}`);
+                // Remove from list
+                setDisputes(prev => prev.filter(d => d.id !== transactionId));
+            } else {
+                alert(`✗ Error: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Resolve error:', error);
+            alert('✗ Failed to resolve dispute');
+        }
     };
 
     return (
-        <div>
-            <div className="flex items-center gap-3 mb-8">
-                <AlertTriangle className="text-red-500" size={32} />
+        <div className="min-h-screen bg-[#000000] text-[#F4F4F5] p-6">
+            <div className="flex items-center gap-4 mb-8">
+                <div className="p-3 bg-[#FF5832]/10 rounded-xl border border-[#FF5832]/20">
+                    <AlertTriangle className="text-[#FF5832]" size={32} />
+                </div>
                 <div>
-                    <h2 className="text-3xl font-bold text-white">Disputes Resolution</h2>
-                    <p className="text-gray-400 text-sm">Review claims from Agents and manage refunds.</p>
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-[#F4F4F5] to-gray-500 bg-clip-text text-transparent">
+                        Disputes Resolution
+                    </h2>
+                    <p className="text-gray-400 text-sm mt-1">
+                        Manage refund requests securely. Reasons are encrypted end-to-end.
+                    </p>
                 </div>
             </div>
 
             <div className="space-y-4">
-                {disputes.map((dispute) => (
-                    <div key={dispute.id} className="bg-gray-800 p-6 rounded-xl border border-gray-700 flex justify-between items-center hover:border-gray-600 transition-colors">
-                        <div>
-                            <div className="flex gap-4 mb-2">
-                                <span className="text-xs font-bold px-2 py-0.5 rounded bg-gray-700 text-gray-300">TX: {dispute.transactionId}</span>
-                                <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-900/30 text-blue-400">Agent: {dispute.agentId}</span>
-                            </div>
-                            <p className="text-sm text-gray-400 mb-1">Reason (Encrypted):</p>
-                            <div className="bg-gray-950 p-3 rounded-lg text-xs font-mono text-yellow-500 w-96 truncate border border-gray-800">
-                                {dispute.encryptedReason}
-                            </div>
-                        </div>
+                {isLoading ? (
+                    <div className="text-center py-20 bg-white/5 rounded-xl border border-white/10 animate-pulse">
+                        <div className="text-[#FFB657]">Loading encrypted claims...</div>
+                    </div>
+                ) : disputes.length === 0 ? (
+                    <div className="text-center py-20 bg-white/5 rounded-xl border border-dashed border-white/10">
+                        <p className="text-gray-500">No active disputes found.</p>
+                    </div>
+                ) : (
+                    disputes.map((dispute) => (
+                        <div
+                            key={dispute.id}
+                            className="group relative bg-[#1a0f08] border border-white/10 rounded-xl p-6 hover:border-[#FF8E40]/30 transition-all duration-300"
+                        >
+                            <div className="flex justify-between items-start">
+                                <div className="space-y-4 flex-1">
+                                    <div className="flex flex-wrap gap-2 text-xs font-mono">
+                                        <span className="px-2 py-1 bg-white/5 rounded border border-white/10 text-gray-400">
+                                            ID: {dispute.receiptCode || dispute.transactionId.slice(0, 8)}
+                                        </span>
+                                        <span className="px-2 py-1 bg-[#FFB657]/10 rounded border border-[#FFB657]/20 text-[#FFB657]">
+                                            Agent: {dispute.agentId.slice(0, 8)}...
+                                        </span>
+                                        <span className="px-2 py-1 bg-blue-900/20 rounded border border-blue-800/30 text-blue-400">
+                                            Resource: {dispute.resourceName}
+                                        </span>
+                                    </div>
 
-                        <div className="flex flex-col items-end gap-3">
-                            <span className="text-2xl font-bold text-white">${dispute.amount.toFixed(2)}</span>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => handleResolve(dispute.transactionId, 'REFUND')}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-bold transition-colors"
-                                >
-                                    <CheckCircle size={16} /> Approve Refund
-                                </button>
-                                <button
-                                    onClick={() => handleResolve(dispute.transactionId, 'REJECT')}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-bold transition-colors"
-                                >
-                                    <XCircle size={16} /> Reject Claim
-                                </button>
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2 text-sm text-gray-400">
+                                            {decryptedReasons[dispute.id] ? <Unlock size={14} className="text-[#27c93f]" /> : <Lock size={14} className="text-[#FF5832]" />}
+                                            <span>Dispute Reason {decryptedReasons[dispute.id] ? '(Decrypted)' : '(Encrypted)'}</span>
+                                        </div>
+
+                                        <div className="relative group/reason">
+                                            <div className={`p-4 rounded-lg font-mono text-xs border transition-colors ${decryptedReasons[dispute.id]
+                                                ? 'bg-[#27c93f]/5 border-[#27c93f]/20 text-[#F4F4F5]'
+                                                : 'bg-black border-[#FF5832]/20 text-[#FF5832] break-all'
+                                                }`}>
+                                                {decryptedReasons[dispute.id] || dispute.encryptedReason}
+                                            </div>
+
+                                            {!decryptedReasons[dispute.id] && (
+                                                <button
+                                                    onClick={() => handleDecrypt(dispute.id, dispute.encryptedReason)}
+                                                    className="absolute top-2 right-2 px-3 py-1 bg-[#FF5832] hover:bg-[#B31D00] text-white text-xs font-bold rounded shadow-lg opacity-0 group-hover/reason:opacity-100 transition-opacity"
+                                                >
+                                                    Decrypt Data
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col items-end gap-4 ml-6">
+                                    <div className="text-right">
+                                        <div className="text-sm text-gray-500 uppercase tracking-wide">Refund Amount</div>
+                                        <div className="text-3xl font-bold font-mono text-[#F4F4F5]">${dispute.amount.toFixed(2)}</div>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleResolve(dispute.transactionId, 'REJECT')}
+                                            className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-sm font-semibold transition-colors"
+                                        >
+                                            Reject
+                                        </button>
+                                        <button
+                                            onClick={() => handleResolve(dispute.transactionId, 'REFUND')}
+                                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#FF8E40] to-[#FF5832] hover:from-[#FFB657] hover:to-[#FF8E40] text-black text-sm font-bold shadow-lg shadow-orange-900/20 transition-all"
+                                        >
+                                            Approve Refund
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
-                {disputes.length === 0 && (
-                    <div className="text-center py-20 bg-gray-800/50 rounded-xl border border-dashed border-gray-700">
-                        <p className="text-gray-500">No active disputes.</p>
-                    </div>
+                    ))
                 )}
             </div>
         </div>

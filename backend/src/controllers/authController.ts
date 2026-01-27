@@ -223,13 +223,84 @@ export const getMerchantStats = async (req: Request, res: Response) => {
         });
         const totalSales = settledTransactions.reduce((sum, tx) => sum + tx.amount, 0);
 
+        // --- NEW: Merchant Resources Analytics ---
+        // Fetch all resources for this merchant
+        const resources = await prisma.resource.findMany({
+            where: { merchantId },
+            include: {
+                transactions: true // Inefficient for large datasets but simple for now
+            }
+        });
+
+        // Calculate analytics
+        const resourcesAnalytics = resources.map(resource => {
+            const accessCount = resource.transactions.length;
+            const disputeCount = resource.transactions.filter(tx => tx.status === 'REFUND_REQUESTED').length;
+
+            return {
+                id: resource.id,
+                title: resource.title,
+                type: resource.type,
+                accessCount,
+                disputeCount
+            };
+        });
+
+        // Sort by Access Count DESC
+        resourcesAnalytics.sort((a, b) => b.accessCount - a.accessCount);
+
         return res.json({
             escrowBalance,
             activeDisputes,
-            totalSales
+            totalSales,
+            resourcesAnalytics
         });
     } catch (error) {
         console.error('Stats fetch error:', error);
         return res.status(500).json({ error: 'Failed to fetch statistics' });
+    }
+};
+
+// GET /api/auth/disputes - Get active disputes
+export const getDisputes = async (req: Request, res: Response) => {
+    try {
+        const merchantId = (req as any).merchantId;
+
+        if (!merchantId) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+
+        const disputes = await prisma.transaction.findMany({
+            where: {
+                merchantId,
+                status: 'REFUND_REQUESTED'
+            },
+            include: {
+                resource: {
+                    select: { title: true }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        // Format for frontend
+        const formattedDisputes = disputes.map(tx => ({
+            id: tx.id,
+            transactionId: tx.id, // Use ID as TX ID or use receiptCode
+            receiptCode: tx.receiptCode,
+            agentId: tx.agentId,
+            amount: tx.amount,
+            encryptedReason: tx.encryptedDisputeReason || 'No reason provided',
+            resourceName: tx.resource?.title || 'Unknown Resource',
+            createdAt: tx.createdAt
+        }));
+
+        return res.json({ disputes: formattedDisputes });
+
+    } catch (error) {
+        console.error('Disputes fetch error:', error);
+        return res.status(500).json({ error: 'Failed to fetch disputes' });
     }
 };
