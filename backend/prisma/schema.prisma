@@ -101,6 +101,13 @@ model Transaction {
   // Storage for Settlement
   paymentHeader          String?   @db.Text
 
+  // AI Dispute Resolution
+  aiDecision             String?   // AI_VALID, AI_INVALID, PENDING_REVIEW
+  aiReasoning            String?   @db.Text
+  aiConfidence           Int?      // 0-100
+  merchantExplanation    String?   @db.Text
+  aiAnalyzedAt           DateTime?
+
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 

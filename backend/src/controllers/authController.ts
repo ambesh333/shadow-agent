@@ -294,7 +294,13 @@ export const getDisputes = async (req: Request, res: Response) => {
             amount: tx.amount,
             encryptedReason: tx.encryptedDisputeReason || 'No reason provided',
             resourceName: tx.resource?.title || 'Unknown Resource',
-            createdAt: tx.createdAt
+            createdAt: tx.createdAt,
+            // AI Decision Fields
+            aiDecision: tx.aiDecision,
+            aiReasoning: tx.aiReasoning,
+            aiConfidence: tx.aiConfidence,
+            aiAnalyzedAt: tx.aiAnalyzedAt,
+            merchantExplanation: tx.merchantExplanation
         }));
 
         return res.json({ disputes: formattedDisputes });

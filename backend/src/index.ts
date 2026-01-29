@@ -14,6 +14,7 @@ import escrowRoutes from './routes/escrowRoutes';
 import authRoutes from './routes/authRoutes';
 import resourceRoutes from './routes/resourceRoutes';
 import gatewayRoutes from './routes/gatewayRoutes';
+import disputeRoutes from './routes/disputeRoutes';
 
 app.use(cors({
     origin: 'http://localhost:3000',
@@ -27,6 +28,7 @@ app.use('/api/gateway', gatewayRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/escrow', escrowRoutes);
+app.use('/api/disputes', disputeRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
