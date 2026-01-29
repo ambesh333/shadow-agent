@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Bot, CheckCircle, XCircle, Lock, Unlock, RefreshCw, MessageSquare, Loader2 } from 'lucide-react';
+import { Bot, CheckCircle, XCircle, RefreshCw, Loader2, ArrowLeft, MessageSquarePlus, ArrowUpRight } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import bs58 from 'bs58';
 
@@ -13,7 +13,6 @@ interface Dispute {
     resourceName: string;
     createdAt: string;
     receiptCode: string | null;
-    // AI Decision Fields
     aiDecision: 'AI_VALID' | 'AI_INVALID' | null;
     aiReasoning: string | null;
     aiConfidence: number | null;
@@ -25,11 +24,12 @@ export default function DisputesPage() {
     const { publicKey, signMessage, connected } = useWallet();
     const [disputes, setDisputes] = useState<Dispute[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [decryptedReasons, setDecryptedReasons] = useState<Record<string, string>>({});
+    const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
     const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
     const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
-    const [expandedExplanation, setExpandedExplanation] = useState<string | null>(null);
+    const [showExplanationForm, setShowExplanationForm] = useState(false);
     const [explanationText, setExplanationText] = useState('');
+    const [activeStep, setActiveStep] = useState(0);
 
     const fetchDisputes = async () => {
         try {
@@ -40,6 +40,11 @@ export default function DisputesPage() {
             if (response.ok) {
                 const data = await response.json();
                 setDisputes(data.disputes);
+                // Update selected dispute if exists
+                if (selectedDispute) {
+                    const updated = data.disputes.find((d: Dispute) => d.id === selectedDispute.id);
+                    if (updated) setSelectedDispute(updated);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch disputes:', error);
@@ -48,87 +53,32 @@ export default function DisputesPage() {
         }
     };
 
-    useEffect(() => {
-        fetchDisputes();
-    }, []);
+    useEffect(() => { fetchDisputes(); }, []);
 
-    // Decrypt dispute reason (for viewing)
-    const handleDecrypt = async (id: string, encryptedText: string) => {
-        if (!connected || !publicKey || !signMessage) {
-            alert('Please connect your wallet to decrypt dispute reasons.');
-            return;
-        }
-
-        try {
-            const message = `Authorize decryption of dispute reason for transaction ${id}\nNonce: ${Date.now()}`;
-            const messageBytes = new TextEncoder().encode(message);
-            const signatureBytes = await signMessage(messageBytes);
-            const signature = bs58.encode(signatureBytes);
-
-            const response = await fetch('http://localhost:3001/api/escrow/decrypt-dispute', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    transactionId: id,
-                    walletAddress: publicKey.toBase58(),
-                    signature: signature,
-                    message: message
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.success) {
-                setDecryptedReasons(prev => ({ ...prev, [id]: data.reason }));
-            } else {
-                alert(`✗ Error: ${data.error || 'Failed to decrypt'}`);
-            }
-        } catch (e: any) {
-            console.error('Decryption failed:', e);
-            alert(`✗ Decryption failed: ${e.message || 'Unknown error'}`);
-        }
-    };
-
-    // Trigger AI analysis
     const handleAIAnalyze = async (transactionId: string) => {
         setAnalyzingIds(prev => new Set(prev).add(transactionId));
-
         try {
             const response = await fetch(`http://localhost:3001/api/disputes/${transactionId}/ai-analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
             });
-
             const data = await response.json();
-
             if (response.ok && data.success) {
                 await fetchDisputes();
             } else {
                 alert(`✗ AI Analysis failed: ${data.error}`);
             }
         } catch (error: any) {
-            console.error('AI analysis error:', error);
             alert(`✗ AI analysis failed: ${error.message}`);
         } finally {
-            setAnalyzingIds(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(transactionId);
-                return newSet;
-            });
+            setAnalyzingIds(prev => { const s = new Set(prev); s.delete(transactionId); return s; });
         }
     };
 
-    // Submit merchant explanation
     const handleSubmitExplanation = async (transactionId: string) => {
-        if (!explanationText.trim()) {
-            alert('Please enter your explanation.');
-            return;
-        }
-
+        if (!explanationText.trim()) { alert('Please enter your explanation.'); return; }
         setAnalyzingIds(prev => new Set(prev).add(transactionId));
-
         try {
             const response = await fetch(`http://localhost:3001/api/disputes/${transactionId}/merchant-explain`, {
                 method: 'POST',
@@ -136,32 +86,23 @@ export default function DisputesPage() {
                 credentials: 'include',
                 body: JSON.stringify({ explanation: explanationText })
             });
-
             const data = await response.json();
-
             if (response.ok && data.success) {
-                setExpandedExplanation(null);
+                setShowExplanationForm(false);
                 setExplanationText('');
                 await fetchDisputes();
             } else {
                 alert(`✗ Error: ${data.error}`);
             }
         } catch (error: any) {
-            console.error('Explanation error:', error);
-            alert(`✗ Failed to submit explanation: ${error.message}`);
+            alert(`✗ Failed: ${error.message}`);
         } finally {
-            setAnalyzingIds(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(transactionId);
-                return newSet;
-            });
+            setAnalyzingIds(prev => { const s = new Set(prev); s.delete(transactionId); return s; });
         }
     };
 
-    // Resolve dispute (approve or reject)
     const handleResolve = async (transactionId: string, decision: 'APPROVE' | 'REJECT') => {
         setResolvingIds(prev => new Set(prev).add(transactionId));
-
         try {
             const response = await fetch(`http://localhost:3001/api/disputes/${transactionId}/resolve`, {
                 method: 'POST',
@@ -169,275 +110,304 @@ export default function DisputesPage() {
                 credentials: 'include',
                 body: JSON.stringify({ decision })
             });
-
             const data = await response.json();
-
             if (response.ok && data.success) {
                 alert(`✓ ${data.message}`);
                 setDisputes(prev => prev.filter(d => d.id !== transactionId));
+                setSelectedDispute(null);
             } else {
                 alert(`✗ Error: ${data.error}`);
             }
         } catch (error: any) {
-            console.error('Resolve error:', error);
-            alert(`✗ Failed to resolve dispute: ${error.message}`);
+            alert(`✗ Failed: ${error.message}`);
         } finally {
-            setResolvingIds(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(transactionId);
-                return newSet;
-            });
+            setResolvingIds(prev => { const s = new Set(prev); s.delete(transactionId); return s; });
         }
     };
 
-    const getAIDecisionStyle = (decision: string | null) => {
-        if (decision === 'AI_VALID') return 'bg-green-900/30 border-green-500/40 text-green-400';
-        if (decision === 'AI_INVALID') return 'bg-red-900/30 border-red-500/40 text-red-400';
-        return 'bg-gray-900/30 border-gray-500/40 text-gray-400';
+    const getStatusBadge = (dispute: Dispute) => {
+        if (!dispute.aiDecision) {
+            return <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-500/20 text-gray-400 border border-gray-500/30">Pending</span>;
+        }
+        if (dispute.aiDecision === 'AI_VALID') {
+            return <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30">Valid</span>;
+        }
+        return <span className="px-3 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400 border border-red-500/30">Invalid</span>;
     };
 
-    return (
-        <div className="min-h-screen bg-[#000000] text-[#F4F4F5] p-6">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
-                <div className="p-3 bg-gradient-to-br from-[#FF5832]/20 to-purple-500/20 rounded-xl border border-[#FF5832]/30">
-                    <Bot className="text-[#FF8E40]" size={32} />
-                </div>
-                <div>
-                    <h2 className="text-3xl font-bold bg-gradient-to-r from-[#FF8E40] via-[#FF5832] to-purple-400 bg-clip-text text-transparent">
-                        AI Dispute Resolution
-                    </h2>
-                    <p className="text-gray-400 text-sm mt-1">
-                        AI-powered analysis. Click Analyse to get recommendations.
-                    </p>
+    // ============= DETAIL CARD VIEW =============
+    if (selectedDispute) {
+        const dispute = disputes.find(d => d.id === selectedDispute.id) || selectedDispute;
+        const isAnalyzing = analyzingIds.has(dispute.id);
+        const isResolving = resolvingIds.has(dispute.id);
+        const isDisputeValid = dispute.aiDecision === 'AI_VALID';
+        const confidence = dispute.aiConfidence || 0;
+
+        // Steps for valid dispute
+        const validSteps = ['AI Analysis', 'Your Response', 'Resolution'];
+        // Steps for invalid dispute
+        const invalidSteps = ['AI Analysis', 'Resolution'];
+        const steps = isDisputeValid ? validSteps : invalidSteps;
+
+        return (
+            <div className="min-h-screen bg-[#0a0a0a] text-[#F4F4F5] p-6 flex items-center justify-center">
+                <div className="w-full max-w-lg">
+                    {/* Back Button */}
+                    <button
+                        onClick={() => { setSelectedDispute(null); setShowExplanationForm(false); setActiveStep(0); }}
+                        className="flex items-center gap-2 text-gray-500 hover:text-white mb-6 transition-colors text-sm"
+                    >
+                        <ArrowLeft size={16} />
+                        <span>Back to Disputes</span>
+                    </button>
+
+                    {/* Main Card */}
+                    <div className="relative bg-gradient-to-br from-[#1a1a1a] via-[#141414] to-[#0f1a0f] rounded-3xl border border-white/10 overflow-hidden">
+                        {/* Glow Effect */}
+                        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[200px] rounded-full blur-[100px] opacity-30 ${isDisputeValid ? 'bg-green-500' : 'bg-red-500'
+                            }`} />
+
+                        {/* Card Header */}
+                        <div className="relative p-6 flex items-center justify-between border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-xl ${isDisputeValid ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                                    <Bot size={18} className={isDisputeValid ? 'text-green-400' : 'text-red-400'} />
+                                </div>
+                                <span className="text-white font-medium">AI Insight</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="px-3 py-1.5 bg-[#252525] rounded-full text-xs text-gray-300 border border-white/10">
+                                    {dispute.resourceName}
+                                </span>
+                                <button className="p-2 bg-[#252525] rounded-full border border-white/10 hover:bg-[#333]">
+                                    <RefreshCw size={14} className="text-gray-400" onClick={() => handleAIAnalyze(dispute.id)} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Card Content */}
+                        <div className="relative p-8">
+                            {/* Large Confidence Percentage */}
+                            <div className="mb-6">
+                                <div className="flex items-start gap-2">
+                                    <span className="text-7xl font-extralight text-white tracking-tight">
+                                        {confidence}%
+                                    </span>
+                                    <ArrowUpRight size={24} className={`mt-3 ${isDisputeValid ? 'text-green-400' : 'text-red-400'}`} />
+                                </div>
+                            </div>
+
+                            {/* Status Text */}
+                            <div className="mb-4">
+                                <span className="text-white font-medium">
+                                    {isDisputeValid ? 'Dispute is valid' : 'Dispute is invalid'}
+                                </span>
+                                <span className="text-gray-500"> based on AI analysis.</span>
+                            </div>
+
+                            {/* Reasoning - Fading Text */}
+                            <p className="text-gray-600 text-sm leading-relaxed mb-8">
+                                {dispute.aiReasoning}
+                            </p>
+
+                            {/* Merchant Explanation (if exists) */}
+                            {dispute.merchantExplanation && (
+                                <div className="mb-6 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                    <div className="text-xs text-blue-400 mb-2">Your Response:</div>
+                                    <p className="text-sm text-blue-300">{dispute.merchantExplanation}</p>
+                                </div>
+                            )}
+
+                            {/* Explanation Form */}
+                            {showExplanationForm && isDisputeValid && (
+                                <div className="mb-6 space-y-3">
+                                    <textarea
+                                        value={explanationText}
+                                        onChange={(e) => setExplanationText(e.target.value)}
+                                        placeholder="Explain why this dispute should be reconsidered..."
+                                        className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 focus:border-green-500/50 focus:outline-none resize-none"
+                                        rows={3}
+                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleSubmitExplanation(dispute.id)}
+                                            disabled={isAnalyzing}
+                                            className="flex-1 py-3 bg-[#252525] hover:bg-[#333] text-white text-sm font-medium rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all"
+                                        >
+                                            {isAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                            Submit & Re-analyze
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowExplanationForm(false); setExplanationText(''); }}
+                                            className="px-4 py-3 bg-[#1a1a1a] hover:bg-[#252525] text-gray-400 text-sm rounded-xl border border-white/10 transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            {!showExplanationForm && (
+                                <div className="flex gap-3">
+                                    {isDisputeValid ? (
+                                        <>
+                                            {/* Valid Dispute: Your Reason + Approve Refund */}
+                                            {!dispute.merchantExplanation && (
+                                                <button
+                                                    onClick={() => setShowExplanationForm(true)}
+                                                    className="flex-1 py-3.5 bg-[#252525] hover:bg-[#333] text-white text-sm font-medium rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all"
+                                                >
+                                                    <MessageSquarePlus size={16} />
+                                                    Your Reason
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleResolve(dispute.id, 'APPROVE')}
+                                                disabled={isResolving}
+                                                className="flex-1 py-3.5 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-900/30"
+                                            >
+                                                {isResolving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                                                Approve Refund
+                                            </button>
+                                        </>
+                                    ) : (
+                                        /* Invalid Dispute: Just Reject Claim */
+                                        <button
+                                            onClick={() => handleResolve(dispute.id, 'REJECT')}
+                                            disabled={isResolving}
+                                            className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-900/30"
+                                        >
+                                            {isResolving ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                                            Reject Claim
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Step Carousel */}
+                        <div className="relative px-8 pb-6">
+                            <div className="flex items-center justify-center gap-2">
+                                {steps.map((step, index) => (
+                                    <div
+                                        key={step}
+                                        className={`h-1 rounded-full transition-all ${index === 0
+                                                ? 'w-8 bg-white'
+                                                : 'w-4 bg-gray-700'
+                                            }`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Amount Info */}
+                    <div className="mt-4 text-center">
+                        <span className="text-gray-500 text-sm">Dispute Amount: </span>
+                        <span className="text-white font-mono font-medium">{dispute.amount.toFixed(4)} SOL</span>
+                    </div>
                 </div>
             </div>
+        );
+    }
 
-            {/* Disputes List */}
-            <div className="space-y-6">
+    // ============= TABLE VIEW =============
+    return (
+        <div className="min-h-screen bg-[#0a0a0a] text-[#F4F4F5] p-6">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-8">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <h2 className="text-xl font-semibold text-white">Active Disputes</h2>
+                <span className="text-gray-500 text-sm">{disputes.length} Disputes</span>
+            </div>
+
+            {/* Table */}
+            <div className="bg-[#141414] rounded-2xl border border-white/5 overflow-hidden">
+                {/* Table Header */}
+                <div className="grid grid-cols-[60px_1fr_1fr_120px_120px_140px] gap-4 px-6 py-4 border-b border-white/5 text-xs text-gray-500 uppercase tracking-wider">
+                    <div>No</div>
+                    <div>Agent</div>
+                    <div>Resource</div>
+                    <div>Amount</div>
+                    <div>Status</div>
+                    <div className="text-right">Action</div>
+                </div>
+
+                {/* Table Body */}
                 {isLoading ? (
-                    <div className="text-center py-20 bg-white/5 rounded-xl border border-white/10">
-                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#FFB657] mb-3" />
-                        <div className="text-[#FFB657]">Loading disputes...</div>
+                    <div className="p-12 text-center">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-600 mb-3" />
+                        <p className="text-gray-500">Loading disputes...</p>
                     </div>
                 ) : disputes.length === 0 ? (
-                    <div className="text-center py-20 bg-white/5 rounded-xl border border-dashed border-white/10">
-                        <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4 opacity-50" />
-                        <p className="text-gray-500">No active disputes. All clear!</p>
+                    <div className="p-12 text-center">
+                        <CheckCircle className="w-10 h-10 mx-auto text-green-500/30 mb-3" />
+                        <p className="text-gray-500">No active disputes</p>
                     </div>
                 ) : (
-                    disputes.map((dispute) => {
+                    disputes.map((dispute, index) => {
                         const isAnalyzing = analyzingIds.has(dispute.id);
-                        const isResolving = resolvingIds.has(dispute.id);
-                        const hasAIDecision = !!dispute.aiDecision;
-                        const isDisputeValid = dispute.aiDecision === 'AI_VALID';
-
                         return (
                             <div
                                 key={dispute.id}
-                                className="bg-gradient-to-br from-[#0a0a0a] to-[#1a0f08] border border-white/10 rounded-2xl overflow-hidden hover:border-[#FF8E40]/30 transition-all duration-300"
+                                className="grid grid-cols-[60px_1fr_1fr_120px_120px_140px] gap-4 px-6 py-5 border-b border-white/5 hover:bg-white/[0.02] transition-colors items-center"
                             >
-                                {/* Card Header */}
-                                <div className="p-6 border-b border-white/5">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex flex-wrap gap-2 text-xs font-mono">
-                                            <span className="px-3 py-1.5 bg-white/5 rounded-lg border border-white/10 text-gray-400">
-                                                #{dispute.receiptCode || dispute.transactionId.slice(0, 8)}
-                                            </span>
-                                            <span className="px-3 py-1.5 bg-[#FFB657]/10 rounded-lg border border-[#FFB657]/20 text-[#FFB657]">
-                                                Agent: {dispute.agentId.slice(0, 6)}...{dispute.agentId.slice(-4)}
-                                            </span>
-                                            <span className="px-3 py-1.5 bg-blue-900/20 rounded-lg border border-blue-800/30 text-blue-400">
-                                                {dispute.resourceName}
-                                            </span>
+                                {/* Number */}
+                                <div className="text-2xl font-bold text-gray-600 font-mono">
+                                    {String(index + 1).padStart(2, '0')}
+                                </div>
+
+                                {/* Agent */}
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FFB657] to-[#FF5832] flex items-center justify-center text-black font-bold text-xs">
+                                        {dispute.agentId.slice(0, 2).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div className="font-mono text-sm text-white">
+                                            {dispute.agentId.slice(0, 4)}...{dispute.agentId.slice(-4)}
                                         </div>
-                                        <div className="text-right">
-                                            <div className="text-xs text-gray-500 uppercase tracking-wide">Amount</div>
-                                            <div className="text-2xl font-bold font-mono text-[#F4F4F5]">
-                                                {dispute.amount.toFixed(4)} <span className="text-sm text-gray-500">SOL</span>
-                                            </div>
-                                        </div>
+                                        <div className="text-xs text-gray-500">Agent Wallet</div>
                                     </div>
                                 </div>
 
-                                {/* No AI Decision Yet - Show Analyse Button */}
-                                {!hasAIDecision && (
-                                    <div className="p-6">
-                                        <div className="flex flex-col items-center justify-center py-8 bg-white/5 rounded-xl border border-dashed border-white/10">
-                                            {isAnalyzing ? (
-                                                <>
-                                                    <Loader2 className="w-10 h-10 animate-spin text-purple-400 mb-4" />
-                                                    <p className="text-gray-300 font-medium">AI is analyzing the dispute...</p>
-                                                    <p className="text-gray-500 text-sm mt-1">This may take a few seconds</p>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Bot className="w-12 h-12 text-gray-600 mb-4" />
-                                                    <p className="text-gray-400 mb-4">Click to start AI analysis</p>
-                                                    <button
-                                                        onClick={() => handleAIAnalyze(dispute.id)}
-                                                        className="px-8 py-3 bg-gradient-to-r from-purple-500 to-[#FF5832] hover:from-purple-400 hover:to-[#FF8E40] text-white font-bold text-lg rounded-xl shadow-lg shadow-purple-900/30 flex items-center gap-3 transition-all"
-                                                    >
-                                                        <Bot size={20} />
-                                                        Analyse
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                {/* Resource */}
+                                <div>
+                                    <div className="text-sm text-white">{dispute.resourceName}</div>
+                                    <div className="text-xs text-gray-500">#{dispute.receiptCode || dispute.id.slice(0, 6)}</div>
+                                </div>
 
-                                {/* AI Decision Available - Show Full UI */}
-                                {hasAIDecision && (
-                                    <>
-                                        {/* AI Analysis Result */}
-                                        <div className="p-6 border-b border-white/5">
-                                            <div className="flex items-center gap-2 mb-3 text-sm text-gray-400">
-                                                <Bot size={14} className="text-purple-400" />
-                                                <span className="font-medium">AI Analysis</span>
-                                            </div>
-                                            <div className={`p-5 rounded-xl border ${getAIDecisionStyle(dispute.aiDecision)}`}>
-                                                <div className="flex items-start justify-between mb-3">
-                                                    <div className="flex items-center gap-3">
-                                                        {isDisputeValid ? (
-                                                            <CheckCircle className="w-6 h-6 text-green-400" />
-                                                        ) : (
-                                                            <XCircle className="w-6 h-6 text-red-400" />
-                                                        )}
-                                                        <div>
-                                                            <div className="font-bold text-lg">
-                                                                {isDisputeValid ? 'Dispute Valid' : 'Dispute Invalid'}
-                                                            </div>
-                                                            <div className="text-sm opacity-70">
-                                                                {dispute.aiConfidence}% confidence
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => handleAIAnalyze(dispute.id)}
-                                                        disabled={isAnalyzing}
-                                                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                                                        title="Re-analyze"
-                                                    >
-                                                        <RefreshCw size={16} className={isAnalyzing ? 'animate-spin' : ''} />
-                                                    </button>
-                                                </div>
-                                                <p className="text-sm opacity-90 leading-relaxed">
-                                                    {dispute.aiReasoning}
-                                                </p>
-                                            </div>
-                                        </div>
+                                {/* Amount */}
+                                <div className="font-mono text-white font-medium">
+                                    {dispute.amount.toFixed(4)}
+                                    <span className="text-gray-500 text-xs ml-1">SOL</span>
+                                </div>
 
-                                        {/* Dispute Reason (Optional Decryption) */}
-                                        <div className="p-6 border-b border-white/5">
-                                            <div className="flex items-center gap-2 mb-3 text-sm text-gray-400">
-                                                {decryptedReasons[dispute.id] ? (
-                                                    <Unlock size={14} className="text-green-400" />
-                                                ) : (
-                                                    <Lock size={14} className="text-gray-500" />
-                                                )}
-                                                <span className="font-medium">Dispute Reason</span>
-                                                {!decryptedReasons[dispute.id] && (
-                                                    <button
-                                                        onClick={() => handleDecrypt(dispute.id, dispute.encryptedReason)}
-                                                        className="ml-2 text-xs text-[#FF8E40] hover:underline"
-                                                    >
-                                                        (click to decrypt)
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <div className={`p-4 rounded-xl font-mono text-sm border ${decryptedReasons[dispute.id]
-                                                    ? 'bg-green-900/10 border-green-500/20 text-[#F4F4F5]'
-                                                    : 'bg-black/30 border-white/10 text-gray-500 italic'
-                                                }`}>
-                                                {decryptedReasons[dispute.id] || 'Encrypted - click to reveal'}
-                                            </div>
-                                        </div>
+                                {/* Status */}
+                                <div>{getStatusBadge(dispute)}</div>
 
-                                        {/* Merchant Explanation Section */}
-                                        <div className="p-6 border-b border-white/5">
-                                            <div className="flex items-center gap-2 mb-3 text-sm text-gray-400">
-                                                <MessageSquare size={14} className="text-blue-400" />
-                                                <span className="font-medium">Your Response</span>
-                                            </div>
-
-                                            {dispute.merchantExplanation ? (
-                                                <div className="p-4 bg-blue-900/20 rounded-xl border border-blue-500/20 text-blue-300 text-sm">
-                                                    {dispute.merchantExplanation}
-                                                </div>
-                                            ) : expandedExplanation === dispute.id ? (
-                                                <div className="space-y-3">
-                                                    <textarea
-                                                        value={explanationText}
-                                                        onChange={(e) => setExplanationText(e.target.value)}
-                                                        placeholder="Explain why this dispute should be reconsidered..."
-                                                        className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-sm text-[#F4F4F5] placeholder-gray-500 focus:border-blue-500/50 focus:outline-none resize-none"
-                                                        rows={3}
-                                                    />
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={() => handleSubmitExplanation(dispute.id)}
-                                                            disabled={isAnalyzing}
-                                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg flex items-center gap-2 transition-colors"
-                                                        >
-                                                            {isAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                                                            Submit & Re-analyze
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                setExpandedExplanation(null);
-                                                                setExplanationText('');
-                                                            }}
-                                                            className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 text-sm font-semibold rounded-lg transition-colors"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    onClick={() => setExpandedExplanation(dispute.id)}
-                                                    className="w-full p-4 border border-dashed border-white/10 rounded-xl text-gray-500 hover:border-blue-500/30 hover:text-blue-400 transition-colors text-sm"
-                                                >
-                                                    + Add explanation to counter AI decision
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        {/* Action Buttons */}
-                                        <div className="p-6 bg-black/30">
-                                            <div className="flex justify-between items-center">
-                                                <div className="text-xs text-gray-600">
-                                                    AI recommends: {isDisputeValid ? 'Approve Refund' : 'Reject Claim'}
-                                                </div>
-                                                <div className="flex gap-3">
-                                                    <button
-                                                        onClick={() => handleResolve(dispute.id, 'REJECT')}
-                                                        disabled={isResolving}
-                                                        className={`px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all ${!isDisputeValid
-                                                                ? 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white shadow-lg shadow-red-900/30'
-                                                                : 'bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300'
-                                                            }`}
-                                                    >
-                                                        {isResolving ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={16} />}
-                                                        Reject Claim
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleResolve(dispute.id, 'APPROVE')}
-                                                        disabled={isResolving}
-                                                        className={`px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all ${isDisputeValid
-                                                                ? 'bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white shadow-lg shadow-green-900/30'
-                                                                : 'bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300'
-                                                            }`}
-                                                    >
-                                                        {isResolving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={16} />}
-                                                        Approve Refund
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
+                                {/* Action */}
+                                <div className="text-right">
+                                    <button
+                                        onClick={() => dispute.aiDecision ? setSelectedDispute(dispute) : handleAIAnalyze(dispute.id)}
+                                        disabled={isAnalyzing}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${dispute.aiDecision
+                                                ? 'bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10'
+                                                : 'bg-[#1a1a1a] hover:bg-[#252525] text-gray-200 border border-white/10 hover:border-purple-500/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)]'
+                                            }`}
+                                    >
+                                        {isAnalyzing ? (
+                                            <Loader2 size={14} className="animate-spin mx-auto" />
+                                        ) : dispute.aiDecision ? (
+                                            'View'
+                                        ) : (
+                                            <span className="flex items-center gap-2">
+                                                <Bot size={14} />
+                                                Analyse
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         );
                     })
