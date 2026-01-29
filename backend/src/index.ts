@@ -26,7 +26,7 @@ app.use(express.json({ limit: '10mb' })); // Increased for base64 images
 app.use('/api/gateway', gatewayRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/resources', resourceRoutes);
-app.use('/api', escrowRoutes);
+app.use('/api/escrow', escrowRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {

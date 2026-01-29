@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma, shadowPay } from '../context';
+import { decryptDisputeMessage, verifyWalletSignature } from '../clients/encryption';
 
 // 1. Discovery / Gateway
 export const getPremiumData = async (req: Request, res: Response) => {
@@ -138,6 +139,70 @@ export const resolveDispute = async (req: Request, res: Response) => {
             return res.json({ success: true, status: 'SETTLED_FORCED' });
         }
     } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+/**
+ * 6. Decrypt Dispute Reason
+ * POST /api/escrow/decrypt-dispute
+ * 
+ * Merchant proves wallet ownership via signature, then we decrypt the dispute reason
+ */
+export const decryptDispute = async (req: Request, res: Response) => {
+    const { transactionId, walletAddress, signature, message } = req.body;
+
+    try {
+        // 1. Find the transaction
+        const tx = await prisma.transaction.findUnique({
+            where: { id: transactionId },
+            include: { merchant: true }
+        });
+
+        if (!tx) {
+            return res.status(404).json({ error: "Transaction not found" });
+        }
+
+        // 2. Verify the requester is the merchant for this transaction
+        if (tx.merchant.walletAddress !== walletAddress) {
+            return res.status(403).json({ error: "Unauthorized - not the merchant for this transaction" });
+        }
+
+        // 3. Verify the wallet signature
+        const isValidSignature = verifyWalletSignature(walletAddress, message, signature);
+        if (!isValidSignature) {
+            return res.status(401).json({ error: "Invalid signature" });
+        }
+
+        // 4. Check if there's an encrypted dispute reason
+        if (!tx.encryptedDisputeReason) {
+            return res.status(400).json({ error: "No encrypted dispute reason found" });
+        }
+
+        // 5. Decrypt the dispute reason
+        const decryptedReason = decryptDisputeMessage(tx.encryptedDisputeReason);
+
+        if (!decryptedReason) {
+            // Fallback: try base64 decode for old disputes
+            try {
+                const legacyDecoded = Buffer.from(tx.encryptedDisputeReason, 'base64').toString('utf-8');
+                return res.json({
+                    success: true,
+                    reason: legacyDecoded,
+                    legacy: true
+                });
+            } catch {
+                return res.status(500).json({ error: "Failed to decrypt dispute reason" });
+            }
+        }
+
+        return res.json({
+            success: true,
+            reason: decryptedReason
+        });
+
+    } catch (error: any) {
+        console.error('Decrypt dispute error:', error);
         return res.status(500).json({ error: error.message });
     }
 };

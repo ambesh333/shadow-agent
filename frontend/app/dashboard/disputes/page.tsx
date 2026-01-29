@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, XCircle, Lock, Unlock } from 'lucide-react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import bs58 from 'bs58';
 
 interface Dispute {
     id: string;
@@ -14,6 +16,7 @@ interface Dispute {
 }
 
 export default function DisputesPage() {
+    const { publicKey, signMessage, connected } = useWallet();
     const [disputes, setDisputes] = useState<Dispute[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [decryptedReasons, setDecryptedReasons] = useState<Record<string, string>>({});
@@ -39,17 +42,45 @@ export default function DisputesPage() {
         fetchDisputes();
     }, []);
 
-    // Simple "Decryption" (Reverse of Terminal's "Encryption")
-    // In a real app, this would use window.crypto.subtle with a shared secret
-    const handleDecrypt = (id: string, encryptedText: string) => {
+    // Secure Decryption via backend using wallet signature verification
+    const handleDecrypt = async (id: string, encryptedText: string) => {
+        if (!connected || !publicKey || !signMessage) {
+            alert('Please connect your wallet to decrypt dispute reasons.');
+            return;
+        }
+
         try {
-            // Demo Strategy: We'll assume the terminal effectively just Base64 encoded or simple obfuscation
-            // Let's implement a simple reversal of what we plan to do in Terminal
-            // Plan: Terminal will base64 encode. So here we decode.
-            const decrypted = atob(encryptedText);
-            setDecryptedReasons(prev => ({ ...prev, [id]: decrypted }));
-        } catch (e) {
-            setDecryptedReasons(prev => ({ ...prev, [id]: 'Error decrypting' }));
+            // 1. Create a message to sign
+            const message = `Authorize decryption of dispute reason for transaction ${id}\nNonce: ${Date.now()}`;
+            const messageBytes = new TextEncoder().encode(message);
+
+            // 2. Request signature from wallet
+            const signatureBytes = await signMessage(messageBytes);
+            const signature = bs58.encode(signatureBytes);
+
+            // 3. Call backend to decrypt
+            const response = await fetch('http://localhost:3001/api/escrow/decrypt-dispute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    transactionId: id,
+                    walletAddress: publicKey.toBase58(),
+                    signature: signature,
+                    message: message
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                setDecryptedReasons(prev => ({ ...prev, [id]: data.reason }));
+            } else {
+                alert(`✗ Error: ${data.error || 'Failed to decrypt'}`);
+            }
+        } catch (e: any) {
+            console.error('Decryption failed:', e);
+            alert(`✗ Decryption failed: ${e.message || 'Unknown error'}`);
         }
     };
 

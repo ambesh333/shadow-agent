@@ -194,12 +194,12 @@ export const getMerchantStats = async (req: Request, res: Response) => {
             return res.status(401).json({ error: 'Not authenticated' });
         }
 
-        // Fetch funds in escrow (PENDING and DELIVERED transactions)
+        // Fetch funds in escrow (PENDING, DELIVERED, and REFUND_REQUESTED transactions)
         // These are confirmed payments held by facilitator but not yet settled/paid out
         const pendingTransactions = await prisma.transaction.findMany({
             where: {
                 merchantId,
-                status: { in: ['PENDING', 'DELIVERED'] }
+                status: { in: ['PENDING', 'DELIVERED', 'REFUND_REQUESTED'] }
             },
             select: { amount: true }
         });

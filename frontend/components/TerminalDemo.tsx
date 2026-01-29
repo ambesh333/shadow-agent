@@ -5,6 +5,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { Transaction, TransactionInstruction } from '@solana/web3.js';
 import { depositToPool, getPoolBalance, payWithShadowWire } from '../lib/shadowWire';
+import { encryptForWallet } from '../lib/encryption';
 
 
 type Step = 'welcome' | 'menu' | 'url-input' | 'fetching' | 'payment' | 'unlocked' | 'settle-prompt' | 'dispute-reason' | 'error' | 'deposit-network' | 'deposit-input' | 'depositing';
@@ -610,9 +611,14 @@ export default function TerminalDemo() {
             }
         } else if (currentStep === 'dispute-reason') {
             if (e.key === 'Enter' && currentInput.trim()) {
-                // "Encrypt" the reason before sending (matching frontend's decryption)
-                const encryptedReason = btoa(currentInput);
-                settleTransaction('DISPUTED', encryptedReason);
+                // Encrypt the reason using facilitator's encryption key
+                try {
+                    const encryptedReason = encryptForWallet(currentInput);
+                    settleTransaction('DISPUTED', encryptedReason);
+                } catch (err) {
+                    console.error('Encryption failed:', err);
+                    addLine('✗ Failed to encrypt dispute reason', 'error');
+                }
             }
         }
     };
