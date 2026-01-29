@@ -82,31 +82,13 @@ export default function TerminalDemo() {
             }
         },
         {
-            label: 'View Saved URLs',
-            action: () => {
-                clearTerminal();
-                const saved = localStorage.getItem('x402_registered_urls');
-                if (saved) {
-                    const urls = JSON.parse(saved);
-                    addLine('Saved URLs:', 'info');
-                    urls.forEach((url: string, i: number) => {
-                        addLine(`  ${i + 1}. ${url}`, 'normal');
-                    });
-                } else {
-                    addLine('No saved URLs', 'info');
-                }
-                addLine('', 'normal');
-                addLine('Press Enter to return to menu...', 'prompt');
-            }
-        },
-        {
             label: 'Deposit to Escrow',
             action: () => {
                 if (!connected || !publicKey) {
                     clearTerminal();
                     addLine('✗ Please connect your wallet first', 'error');
                     addLine('', 'normal');
-                    addLine('Press Enter to return to menu...', 'prompt');
+                    addLine('Press ctrl + c to return to menu...', 'prompt');
                     return;
                 }
                 clearTerminal();
@@ -126,7 +108,7 @@ export default function TerminalDemo() {
                     clearTerminal();
                     addLine('✗ Please connect your wallet first', 'error');
                     addLine('', 'normal');
-                    addLine('Press Enter to return to menu...', 'prompt');
+                    addLine('Press ctrl + c to return to menu...', 'prompt');
                     return;
                 }
                 clearTerminal();
@@ -151,24 +133,14 @@ export default function TerminalDemo() {
                     addLine(`✗ Error: ${e.message}`, 'error');
                 }
 
-                addLine('Press Enter to return to menu...', 'prompt');
+                addLine('Press ctrl + c to return to menu...', 'prompt');
                 // No special step, stay on generic page or redirect
                 // We reuse 'unlocked' step behavior for "Press Enter to return"
                 setCurrentStep('unlocked');
                 // Hack: clear unlockedContent so it doesn't show old content
                 setUnlockedContent(null);
             }
-        },
-        {
-            label: 'Clear History',
-            action: () => {
-                localStorage.removeItem('x402_registered_urls');
-                clearTerminal();
-                addLine('✓ History cleared', 'success');
-                addLine('', 'normal');
-                addLine('Press Enter to return to menu...', 'prompt');
-            }
-        },
+        }
     ];
 
     const handleFetchResource = async (url: string) => {
@@ -475,14 +447,14 @@ export default function TerminalDemo() {
             addLine('', 'normal');
             addLine('Your escrow is now funded for ZK payments!', 'success');
             addLine('', 'normal');
-            addLine('Press Enter to return to menu...', 'prompt');
+            addLine('Press ctrl + c to return to menu...', 'prompt');
             setCurrentStep('unlocked');
 
         } catch (e: any) {
             console.error(e);
             addLine(`✗ Error: ${e.message}`, 'error');
             addLine('', 'normal');
-            addLine('Press Enter to return to menu...', 'prompt');
+            addLine('Press ctrl + c to return to menu...', 'prompt');
             setCurrentStep('error');
         } finally {
             setIsLoading(false);
@@ -533,7 +505,7 @@ export default function TerminalDemo() {
         } finally {
             setIsLoading(false);
             addLine('', 'normal');
-            addLine('Press Enter to return to menu...', 'prompt');
+            addLine('Press ctrl + c to return to menu...', 'prompt');
             setCurrentStep('unlocked'); // Go back to final state wait
         }
     };

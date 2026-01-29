@@ -151,7 +151,7 @@ export default function DisputesPage() {
                                 <div className="flex flex-col items-end gap-4 ml-6">
                                     <div className="text-right">
                                         <div className="text-sm text-gray-500 uppercase tracking-wide">Refund Amount</div>
-                                        <div className="text-3xl font-bold font-mono text-[#F4F4F5]">${dispute.amount.toFixed(2)}</div>
+                                        <div className="text-3xl font-bold font-mono text-[#F4F4F5]">${dispute.amount.toFixed(4)}</div>
                                     </div>
 
                                     <div className="flex gap-2">

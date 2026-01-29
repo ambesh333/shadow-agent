@@ -7,7 +7,7 @@ import { RecipientNotFoundError } from '../clients/errors';
 
 const FACILITATOR_WALLET = process.env.FACILITATOR_WALLET_ADDRESS;
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-const SHADOWPAY_API_URL = process.env.SHADOWPAY_API_URL || 'https://api.shadowpay.com';
+const SHADOWPAY_API_URL = process.env.SHADOWPAY_API_URL || 'https://shadow.radr.fun/shadowpay';
 const SHADOWPAY_API_KEY = process.env.SHADOWPAY_API_KEY;
 
 /**
@@ -361,7 +361,7 @@ export const settleTransaction = async (req: Request, res: Response) => {
                     recipient_wallet: merchantWallet,
                     token: 'SOL',
                     nonce: nonce,
-                    amount: amountSOL,
+                    amount: amountSmallestUnit, // Send in lamports
                     proof_bytes: proof.proofBytes || '',
                     commitment: proof.commitmentBytes || '',
                 };
@@ -369,11 +369,11 @@ export const settleTransaction = async (req: Request, res: Response) => {
                 // Helper to perform the transfer request
                 const performTransfer = async (isInternal: boolean) => {
                     const endpoint = isInternal ? 'internal-transfer' : 'external-transfer';
-                    const response = await fetch(`${SHADOWPAY_API_URL}/zk/${endpoint}`, {
+                    const response = await fetch(`${SHADOWPAY_API_URL}/api/zk/${endpoint}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${SHADOWPAY_API_KEY}`,
+                            'X-API-Key': SHADOWPAY_API_KEY || '',
                         },
                         body: JSON.stringify(requestData),
                     });
@@ -510,18 +510,18 @@ export const resolveDispute = async (req: Request, res: Response) => {
                 recipient_wallet: recipientWallet,
                 token: 'SOL',
                 nonce: nonce,
-                amount: amountSOL,
+                amount: amountSmallestUnit, // Send in lamports
                 proof_bytes: proof.proofBytes || '',
                 commitment: proof.commitmentBytes || '',
             };
 
             const performTransfer = async (isInternal: boolean) => {
                 const endpoint = isInternal ? 'internal-transfer' : 'external-transfer';
-                const response = await fetch(`${SHADOWPAY_API_URL}/zk/${endpoint}`, {
+                const response = await fetch(`${SHADOWPAY_API_URL}/api/zk/${endpoint}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${SHADOWPAY_API_KEY}`,
+                        'X-API-Key': SHADOWPAY_API_KEY || '',
                     },
                     body: JSON.stringify(requestData),
                 });
