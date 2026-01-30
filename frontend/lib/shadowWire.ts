@@ -2,15 +2,29 @@ import { ShadowWireClient, initWASM } from '@radr/shadowwire';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { SHADOWWIRE_API_URL } from './config';
 
-// Initialize the SDK client
-// Explicitly set apiBaseUrl to prevent undefined URL errors during build
-export const shadowWire = new ShadowWireClient({
-    apiBaseUrl: SHADOWWIRE_API_URL,
-    debug: process.env.NODE_ENV === 'development',
-});
+// Lazy-loaded SDK client to prevent build-time initialization errors
+// The client is created on first access, not at module load time
+let _shadowWireInstance: ShadowWireClient | null = null;
 
-// Initialize WASM with the correct public path
-// This is required because the SDK's default resolution fails in some Next.js setups
+export const getShadowWire = (): ShadowWireClient => {
+    if (!_shadowWireInstance) {
+        _shadowWireInstance = new ShadowWireClient({
+            apiBaseUrl: SHADOWWIRE_API_URL,
+            debug: process.env.NODE_ENV === 'development',
+        });
+    }
+    return _shadowWireInstance;
+};
+
+// For backward compatibility - lazy getter
+export const shadowWire = {
+    get deposit() { return getShadowWire().deposit.bind(getShadowWire()); },
+    get internalTransfer() { return getShadowWire().internalTransfer.bind(getShadowWire()); },
+    get generateProofLocally() { return getShadowWire().generateProofLocally.bind(getShadowWire()); },
+    get getBalance() { return getShadowWire().getBalance.bind(getShadowWire()); },
+};
+
+// Initialize WASM with the correct public path (only in browser)
 if (typeof window !== 'undefined') {
     initWASM('/wasm/settler_wasm_bg.wasm').catch(e => {
         console.error('Failed to initialize ShadowWire WASM:', e);
