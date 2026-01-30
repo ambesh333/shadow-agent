@@ -13,7 +13,7 @@ function isNode(): boolean {
     return typeof process !== 'undefined' &&
         process.versions != null &&
         process.versions.node != null &&
-        typeof window === 'undefined';
+        typeof (globalThis as any).window === 'undefined';
 }
 
 export async function initWASM(wasmUrl?: string): Promise<void> {
@@ -146,8 +146,9 @@ export async function verifyRangeProof(
 
 export function isWASMSupported(): boolean {
     try {
-        return typeof WebAssembly === 'object' &&
-            typeof WebAssembly.instantiate === 'function';
+        const wasm = (globalThis as any).WebAssembly;
+        return typeof wasm === 'object' &&
+            typeof wasm.instantiate === 'function';
     } catch (e) {
         return false;
     }

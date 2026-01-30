@@ -273,7 +273,7 @@ export const resolveAIDispute = async (req: Request, res: Response) => {
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
+                    const errorData = await response.json().catch(() => ({})) as any;
                     throw new Error(errorData.error || `ShadowPay API error: ${response.statusText}`);
                 }
 

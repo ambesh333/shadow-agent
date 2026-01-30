@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Bot, CheckCircle, XCircle, RefreshCw, Loader2, ArrowLeft, MessageSquarePlus, ArrowUpRight } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import bs58 from 'bs58';
+import { API_URL } from '@/lib/config';
 
 interface Dispute {
     id: string;
@@ -33,7 +34,7 @@ export default function DisputesPage() {
 
     const fetchDisputes = async () => {
         try {
-            const response = await fetch('http://localhost:3001/api/auth/disputes', {
+            const response = await fetch(`${API_URL}/auth/disputes`, {
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
             });
@@ -58,7 +59,7 @@ export default function DisputesPage() {
     const handleAIAnalyze = async (transactionId: string) => {
         setAnalyzingIds(prev => new Set(prev).add(transactionId));
         try {
-            const response = await fetch(`http://localhost:3001/api/disputes/${transactionId}/ai-analyze`, {
+            const response = await fetch(`${API_URL}/disputes/${transactionId}/ai-analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -80,7 +81,7 @@ export default function DisputesPage() {
         if (!explanationText.trim()) { alert('Please enter your explanation.'); return; }
         setAnalyzingIds(prev => new Set(prev).add(transactionId));
         try {
-            const response = await fetch(`http://localhost:3001/api/disputes/${transactionId}/merchant-explain`, {
+            const response = await fetch(`${API_URL}/disputes/${transactionId}/merchant-explain`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -104,7 +105,7 @@ export default function DisputesPage() {
     const handleResolve = async (transactionId: string, decision: 'APPROVE' | 'REJECT') => {
         setResolvingIds(prev => new Set(prev).add(transactionId));
         try {
-            const response = await fetch(`http://localhost:3001/api/disputes/${transactionId}/resolve`, {
+            const response = await fetch(`${API_URL}/disputes/${transactionId}/resolve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -293,8 +294,8 @@ export default function DisputesPage() {
                                     <div
                                         key={step}
                                         className={`h-1 rounded-full transition-all ${index === 0
-                                                ? 'w-8 bg-white'
-                                                : 'w-4 bg-gray-700'
+                                            ? 'w-8 bg-white'
+                                            : 'w-4 bg-gray-700'
                                             }`}
                                     />
                                 ))}
@@ -392,8 +393,8 @@ export default function DisputesPage() {
                                         onClick={() => dispute.aiDecision ? setSelectedDispute(dispute) : handleAIAnalyze(dispute.id)}
                                         disabled={isAnalyzing}
                                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${dispute.aiDecision
-                                                ? 'bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10'
-                                                : 'bg-[#1a1a1a] hover:bg-[#252525] text-gray-200 border border-white/10 hover:border-purple-500/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)]'
+                                            ? 'bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10'
+                                            : 'bg-[#1a1a1a] hover:bg-[#252525] text-gray-200 border border-white/10 hover:border-purple-500/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)]'
                                             }`}
                                     >
                                         {isAnalyzing ? (

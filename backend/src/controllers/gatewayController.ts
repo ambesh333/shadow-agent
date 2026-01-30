@@ -379,7 +379,7 @@ export const settleTransaction = async (req: Request, res: Response) => {
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}));
+                        const errorData = await response.json().catch(() => ({})) as any;
                         throw new Error(errorData.error || `ShadowPay API error: ${response.statusText}`);
                     }
 
@@ -388,10 +388,8 @@ export const settleTransaction = async (req: Request, res: Response) => {
 
                 let apiResult;
                 try {
-                    // Try internal transfer first
                     apiResult = await performTransfer(true);
                 } catch (error: any) {
-                    // If recipient not found, try external transfer
                     if (error.message.includes('Recipient not found') || error.message.includes('404')) {
                         console.log('Recipient not found internally, attempting external transfer...');
                         apiResult = await performTransfer(false);
@@ -527,7 +525,7 @@ export const resolveDispute = async (req: Request, res: Response) => {
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
+                    const errorData = await response.json().catch(() => ({})) as any;
                     throw new Error(errorData.error || `ShadowPay API error: ${response.statusText}`);
                 }
 

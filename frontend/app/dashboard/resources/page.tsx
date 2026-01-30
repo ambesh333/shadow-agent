@@ -91,7 +91,7 @@ function ResourceCard({ resource, onDelete }: { resource: Resource; onDelete: (i
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
-        const url = `http://localhost:3001/api/gateway/resource/${resource.id}`;
+        const url = `${API_URL}/gateway/resource/${resource.id}`;
         navigator.clipboard.writeText(url);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -137,7 +137,7 @@ function ResourceCard({ resource, onDelete }: { resource: Resource; onDelete: (i
                 <label className="text-[10px] uppercase font-bold text-gray-600 block mb-2 tracking-wider">Gateway URL</label>
                 <div className="flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
                     <code className="text-[10px] text-[#FFB657] truncate flex-1 font-mono">
-                        {`http://localhost:3001/api/gateway/resource/${resource.id}`}
+                        {`${API_URL}/gateway/resource/${resource.id}`}
                     </code>
                     <button
                         onClick={handleCopy}
@@ -147,7 +147,7 @@ function ResourceCard({ resource, onDelete }: { resource: Resource; onDelete: (i
                         {copied ? <Check size={12} /> : <Copy size={12} />}
                     </button>
                     <Link
-                        href={`/dashboard/demo?url=${encodeURIComponent(`http://localhost:3001/api/gateway/resource/${resource.id}`)}`}
+                        href={`/dashboard/demo?url=${encodeURIComponent(`${API_URL}/gateway/resource/${resource.id}`)}`}
                         className="p-1.5 text-gray-500 hover:text-[#FF8E40] hover:bg-white/10 rounded transition-colors"
                         title="Open Simulator"
                     >

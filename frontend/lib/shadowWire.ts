@@ -1,10 +1,11 @@
 import { ShadowWireClient, initWASM } from '@radr/shadowwire';
 import { Connection, PublicKey } from '@solana/web3.js';
+import { SHADOWWIRE_API_URL } from './config';
 
 // Initialize the SDK client
-// We use the public mainnet endpoint by default or custom if needed
+// Explicitly set apiBaseUrl to prevent undefined URL errors during build
 export const shadowWire = new ShadowWireClient({
-    // apiBaseUrl: 'https://shadow.radr.fun/shadowpay/api', // Default in SDK usually covers this
+    apiBaseUrl: SHADOWWIRE_API_URL,
     debug: process.env.NODE_ENV === 'development',
 });
 

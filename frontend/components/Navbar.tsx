@@ -28,7 +28,7 @@ export default function Navbar() {
                     {/* CTA Buttons */}
                     <div className="hidden md:flex items-center gap-3">
                         <Link href="/dashboard" className="px-8 py-3 bg-[#FF8E40] hover:bg-[#FF5832] text-white font-semibold rounded-full transition-colors text-sm">
-                            Build with x402
+                            Build with shadow
                         </Link>
                     </div>
 
@@ -59,7 +59,7 @@ export default function Navbar() {
                             </Link>
                             <div className="flex flex-col gap-2 mt-2">
                                 <Link href="/dashboard" className="px-8 py-3 bg-[#FF8E40] hover:bg-[#FF5832] text-white font-semibold rounded-full transition-colors text-sm text-center">
-                                    Build with x402
+                                    Build with shadow
                                 </Link>
                             </div>
                         </div>
