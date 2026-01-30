@@ -19,15 +19,22 @@ import disputeRoutes from './routes/disputeRoutes';
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3000',
     'http://localhost:3000',
+    'https://shadow-agent-henna.vercel.app',
 ];
 
 app.use(cors({
     origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.includes(origin)) {
+        // Check if the origin is in the allowed list
+        const isAllowed = allowedOrigins.includes(origin) ||
+            origin.endsWith('.vercel.app'); // Flexible for Vercel previews
+
+        if (isAllowed) {
             callback(null, true);
         } else {
+            console.warn(`CORS blocked for origin: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
