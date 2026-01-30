@@ -12,10 +12,7 @@
     "strict": false,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
-    "types": [
-      "node"
-    ]
+    "moduleResolution": "node"
   },
   "include": [
     "src/**/*"
