@@ -39,3 +39,4 @@ scripts/validate_deposit.ts
 
 scripts/
 reference/
+build.sh
