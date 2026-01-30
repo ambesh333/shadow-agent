@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { API_URL } from '@/lib/config';
+import { getApiUrl } from '@/lib/config';
 
 export default function DashboardPage() {
     const [stats, setStats] = useState({
@@ -13,6 +13,7 @@ export default function DashboardPage() {
     useEffect(() => {
         const fetchStats = async () => {
             try {
+                const API_URL = getApiUrl();
                 const response = await fetch(`${API_URL}/auth/stats`, {
                     headers: {
                         'Content-Type': 'application/json',

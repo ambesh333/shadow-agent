@@ -8,14 +8,14 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies with legacy peer deps to handle @shadowpay/server express conflict
+# Install all dependencies
 RUN npm ci --legacy-peer-deps
+
+# Generate Prisma Client (using installed v6)
+RUN npx prisma generate
 
 # Copy source code
 COPY . .
-
-# Generate Prisma Client
-RUN npx prisma generate
 
 # Build TypeScript
 RUN npm run build
@@ -25,25 +25,19 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and install production deps
 COPY package*.json ./
+RUN npm ci --omit=dev --legacy-peer-deps
 
-# Install production dependencies only with legacy peer deps
-RUN npm ci --only=production --legacy-peer-deps && \
-    npm cache clean --force
-
-# Copy Prisma schema
+# Copy prisma schema
 COPY prisma ./prisma/
 
-# Copy generated Prisma Client from builder (avoids Prisma version mismatch)
+# Copy the complete prisma installation from builder (includes CLI and engines)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-
-# Copy Prisma CLI from builder to avoid npx installing v7
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
-# Copy built application from builder
+# Copy built application
 COPY --from=builder /app/dist ./dist
 
 # Expose port
@@ -53,5 +47,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
   CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Run migrations and start the app (use local prisma, not npx)
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/index.js"]
+# Run migrations using node directly to avoid npx, then start app
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node dist/index.js"]

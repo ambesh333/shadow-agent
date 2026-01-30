@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Bot, CheckCircle, XCircle, RefreshCw, Loader2, ArrowLeft, MessageSquarePlus, ArrowUpRight } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import bs58 from 'bs58';
-import { API_URL } from '@/lib/config';
+import { getApiUrl } from '@/lib/config';
 
 interface Dispute {
     id: string;
@@ -34,6 +34,7 @@ export default function DisputesPage() {
 
     const fetchDisputes = async () => {
         try {
+            const API_URL = getApiUrl();
             const response = await fetch(`${API_URL}/auth/disputes`, {
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -59,6 +60,7 @@ export default function DisputesPage() {
     const handleAIAnalyze = async (transactionId: string) => {
         setAnalyzingIds(prev => new Set(prev).add(transactionId));
         try {
+            const API_URL = getApiUrl();
             const response = await fetch(`${API_URL}/disputes/${transactionId}/ai-analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -81,6 +83,7 @@ export default function DisputesPage() {
         if (!explanationText.trim()) { alert('Please enter your explanation.'); return; }
         setAnalyzingIds(prev => new Set(prev).add(transactionId));
         try {
+            const API_URL = getApiUrl();
             const response = await fetch(`${API_URL}/disputes/${transactionId}/merchant-explain`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -105,6 +108,7 @@ export default function DisputesPage() {
     const handleResolve = async (transactionId: string, decision: 'APPROVE' | 'REJECT') => {
         setResolvingIds(prev => new Set(prev).add(transactionId));
         try {
+            const API_URL = getApiUrl();
             const response = await fetch(`${API_URL}/disputes/${transactionId}/resolve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

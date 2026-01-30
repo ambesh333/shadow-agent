@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { API_URL } from '@/lib/config';
+import { getApiUrl } from '@/lib/config';
 import bs58 from 'bs58';
 
 interface User {
@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const checkSession = async () => {
         try {
+            const API_URL = getApiUrl();
             const res = await fetch(`${API_URL}/auth/me`, {
                 credentials: 'include'
             });
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(null);
 
         try {
+            const API_URL = getApiUrl();
             // Step 1: Get nonce
             const nonceRes = await fetch(`${API_URL}/auth/nonce`, {
                 method: 'POST',
@@ -123,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const signOut = useCallback(async () => {
         try {
+            const API_URL = getApiUrl();
             await fetch(`${API_URL}/auth/logout`, {
                 method: 'POST',
                 credentials: 'include'

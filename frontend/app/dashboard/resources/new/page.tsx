@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_URL } from '@/lib/config';
+import { getApiUrl } from '@/lib/config';
 import { useAuth } from '@/components/AuthContext';
 import { ArrowLeft, Upload, Image, Video, Link as LinkIcon, Loader2, Check } from 'lucide-react';
 import Link from 'next/link';
@@ -67,6 +67,7 @@ export default function NewResourcePage() {
         setIsSubmitting(true);
 
         try {
+            const API_URL = getApiUrl();
             const res = await fetch(`${API_URL}/resources`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -136,8 +137,8 @@ export default function NewResourcePage() {
                                     type="button"
                                     onClick={() => setType(value as ResourceType)}
                                     className={`relative flex flex-col items-center gap-3 p-6 rounded-2xl border transition-all duration-300 group ${type === value
-                                            ? 'bg-white/10 border-[#FFB657] shadow-[0_0_30px_-10px_rgba(255,182,87,0.3)]'
-                                            : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
+                                        ? 'bg-white/10 border-[#FFB657] shadow-[0_0_30px_-10px_rgba(255,182,87,0.3)]'
+                                        : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
                                         }`}
                                 >
                                     {type === value && (

@@ -6,7 +6,7 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { Transaction, TransactionInstruction } from '@solana/web3.js';
 import { depositToPool, getPoolBalance, payWithShadowWire } from '../lib/shadowWire';
 import { encryptForWallet } from '../lib/encryption';
-import { API_URL } from '../lib/config';
+import { getApiUrl } from '../lib/config';
 
 
 type Step = 'welcome' | 'menu' | 'url-input' | 'fetching' | 'payment' | 'unlocked' | 'settle-prompt' | 'dispute-reason' | 'error' | 'deposit-network' | 'deposit-input' | 'depositing';
@@ -482,6 +482,7 @@ export default function TerminalDemo() {
         addLine(status === 'SETTLED' ? 'Confirming receipt...' : 'Submitting dispute...', 'info');
 
         try {
+            const API_URL = getApiUrl();
             const res = await fetch(`${API_URL}/gateway/settle`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
