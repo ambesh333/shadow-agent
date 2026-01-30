@@ -1,5 +1,5 @@
 'use client';
-import { FC, ReactNode, useMemo } from 'react';
+import { FC, ReactNode, useMemo, useState, useEffect } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
@@ -13,6 +13,13 @@ interface WalletContextProviderProps {
 }
 
 export const WalletContextProvider: FC<WalletContextProviderProps> = ({ children }) => {
+    // Track if we're on the client side
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     // Use mainnet or devnet as needed
     const endpoint = useMemo(() => process.env.NEXT_PUBLIC_SOLANA_RPC_URL || clusterApiUrl('mainnet-beta'), []);
 
@@ -21,6 +28,12 @@ export const WalletContextProvider: FC<WalletContextProviderProps> = ({ children
         new PhantomWalletAdapter(),
         new SolflareWalletAdapter(),
     ], []);
+
+    // During SSR/prerender, render children without wallet context
+    // This prevents Connection from being created with invalid URL during build
+    if (!mounted) {
+        return <>{children}</>;
+    }
 
     return (
         <ConnectionProvider endpoint={endpoint}>
