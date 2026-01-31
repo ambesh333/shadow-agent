@@ -331,7 +331,7 @@ export default function DocumentationPage() {
 
                             <div className="bg-gradient-to-r from-[#FF8E40]/10 to-transparent rounded-xl border border-[#FF8E40]/20 p-4 mb-6">
                                 <p className="text-[#FFB657] text-sm font-mono">
-                                    Base URL: <span className="text-white">https://shadow.radr.fun/shadowpay</span>
+                                    Base URL: <span className="text-white">https://shadow-backend-3jh6.onrender.com</span>
                                 </p>
                             </div>
 
