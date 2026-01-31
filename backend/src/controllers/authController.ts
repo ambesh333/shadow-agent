@@ -157,6 +157,9 @@ export const verifySignature = async (req: Request, res: Response) => {
             { expiresIn: JWT_EXPIRY }
         );
 
+        console.log(`[Auth] Login successful for wallet: ${publicKey}`);
+        console.log(`[Auth] Token generated (length: ${token.length})`);
+
         // Set httpOnly cookie
         res.cookie('session_token', token, {
             httpOnly: true,
