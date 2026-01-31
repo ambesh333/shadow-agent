@@ -6,9 +6,9 @@ import Image from 'next/image';
 
 const texts = [
     'AI-powered payments',
-    'zero-knowledge proofs',
-    'secure escrow',
-    'private transactions'
+    'Zero-knowledge proofs',
+    'Secure escrow',
+    'Private transactions'
 ];
 
 export default function Hero() {
