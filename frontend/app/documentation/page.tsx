@@ -341,7 +341,7 @@ export default function DocumentationPage() {
                                     <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-mono rounded">GET</span>
                                     <code className="text-white font-mono">/api/explore</code>
                                 </div>
-                                <p className="text-gray-400 text-sm mb-4">List all available resources (public, no auth required).</p>
+                                <p className="text-gray-400 text-sm mb-4">List all available resources with trust scores (public, no auth required).</p>
                                 <div className="bg-black rounded-lg p-4">
                                     <pre className="text-sm text-gray-400 overflow-x-auto">{`// Response
 {
@@ -354,17 +354,11 @@ export default function DocumentationPage() {
       "price": 0.001,
       "network": "MAINNET",
       "token": "NATIVE",
-      "merchant": {
-        "walletAddress": "4RWb4myx...",
-        "displayName": "DataCorp"
-      }
+      "trustScore": 85,
+      "trustLabel": "Excellent"
     }
   ],
-  "count": 1,
-  "endpoint": {
-    "access": "/api/explore/{id}/access",
-    "details": "/api/explore/{id}"
-  }
+  "count": 1
 }`}</pre>
                                 </div>
                             </div>
@@ -375,17 +369,21 @@ export default function DocumentationPage() {
                                     <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-mono rounded">GET</span>
                                     <code className="text-white font-mono">/api/explore/:id</code>
                                 </div>
-                                <p className="text-gray-400 text-sm mb-4">Get resource details including payment info.</p>
+                                <p className="text-gray-400 text-sm mb-4">Get resource details including payment info and trust score.</p>
                                 <div className="bg-black rounded-lg p-4">
                                     <pre className="text-sm text-gray-400 overflow-x-auto">{`// Response
 {
-  "resource": { ... },
+  "resource": {
+    "id": "abc123",
+    "title": "Premium Dataset",
+    "trustScore": 85,
+    "trustLabel": "Excellent"
+  },
   "payment": {
     "required": true,
     "amount": 0.001,
     "token": "NATIVE",
-    "recipient": "4RWb4myx...",
-    "accessEndpoint": "/api/explore/abc123/access"
+    "accessEndpoint": "/api/gateway/resource/abc123"
   }
 }`}</pre>
                                 </div>
@@ -395,15 +393,14 @@ export default function DocumentationPage() {
                             <div className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-6">
                                 <div className="flex items-center gap-3 mb-4">
                                     <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs font-mono rounded">GET</span>
-                                    <code className="text-white font-mono">/api/explore/:id/access</code>
+                                    <code className="text-white font-mono">/api/gateway/resource/:id</code>
                                 </div>
-                                <p className="text-gray-400 text-sm mb-4">Access resource content. Returns 402 with payment info if payment required.</p>
+                                <p className="text-gray-400 text-sm mb-4">Primary endpoint for AI agents. Returns 402 with payment info if payment required.</p>
                                 <div className="bg-black rounded-lg p-4 mb-4">
                                     <pre className="text-sm text-gray-400 overflow-x-auto">{`// 402 Response Headers
 X-Payment-Required: true
 X-Payment-Amount: 1000000  // lamports
 X-Payment-Token: NATIVE
-X-Payment-Recipient: 4RWb4myx...
 X-Payment-Network: MAINNET
 X-Resource-ID: abc123`}</pre>
                                 </div>
@@ -439,41 +436,31 @@ X-Resource-ID: abc123`}</pre>
                                 </div>
                             </div>
 
-                            {/* Confirm Delivery */}
-                            <div className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-mono rounded">POST</span>
-                                    <code className="text-white font-mono">/api/escrow/:receiptCode/confirm</code>
-                                </div>
-                                <p className="text-gray-400 text-sm mb-4">Confirm resource delivery (releases funds to merchant).</p>
-                                <div className="bg-black rounded-lg p-4">
-                                    <pre className="text-sm text-gray-400 overflow-x-auto">{`// Response
-{
-  "success": true,
-  "status": "SETTLED",
-  "message": "Payment released to merchant"
-}`}</pre>
-                                </div>
-                            </div>
-
-                            {/* File Dispute */}
+                            {/* Settle Transaction */}
                             <div className="bg-[#111] rounded-2xl border border-white/10 p-6">
                                 <div className="flex items-center gap-3 mb-4">
-                                    <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-mono rounded">POST</span>
-                                    <code className="text-white font-mono">/api/escrow/:receiptCode/dispute</code>
+                                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-mono rounded">POST</span>
+                                    <code className="text-white font-mono">/api/gateway/settle</code>
                                 </div>
-                                <p className="text-gray-400 text-sm mb-4">File a dispute if resource doesn't match description.</p>
+                                <p className="text-gray-400 text-sm mb-4">Confirm delivery (releases funds) or file a dispute. Used by both agents and merchants.</p>
                                 <div className="bg-black rounded-lg p-4">
-                                    <pre className="text-sm text-gray-400 overflow-x-auto">{`// Request Body
+                                    <pre className="text-sm text-gray-400 overflow-x-auto">{`// Confirm Delivery Request
 {
+  "transactionId": "tx_456",
+  "status": "SETTLED"
+}
+
+// Dispute Request  
+{
+  "transactionId": "tx_456",
+  "status": "DISPUTED",
   "reason": "Resource content does not match description"
 }
 
 // Response
 {
   "success": true,
-  "status": "REFUND_REQUESTED",
-  "message": "Dispute filed successfully"
+  "message": "Transaction updated"
 }`}</pre>
                                 </div>
                             </div>
