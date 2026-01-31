@@ -161,7 +161,7 @@ export const verifySignature = async (req: Request, res: Response) => {
         res.cookie('session_token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
@@ -181,7 +181,11 @@ export const verifySignature = async (req: Request, res: Response) => {
 
 // GET /api/auth/logout - Clear session
 export const logout = async (req: Request, res: Response) => {
-    res.clearCookie('session_token');
+    res.clearCookie('session_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    });
     return res.json({ success: true });
 };
 
