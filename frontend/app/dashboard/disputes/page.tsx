@@ -36,7 +36,10 @@ export default function DisputesPage() {
         try {
             const API_URL = getApiUrl();
             const response = await fetch(`${API_URL}/auth/disputes`, {
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+                },
                 credentials: 'include',
             });
             if (response.ok) {
@@ -63,7 +66,10 @@ export default function DisputesPage() {
             const API_URL = getApiUrl();
             const response = await fetch(`${API_URL}/disputes/${transactionId}/ai-analyze`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+                },
                 credentials: 'include',
             });
             const data = await response.json();
@@ -86,7 +92,10 @@ export default function DisputesPage() {
             const API_URL = getApiUrl();
             const response = await fetch(`${API_URL}/disputes/${transactionId}/merchant-explain`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+                },
                 credentials: 'include',
                 body: JSON.stringify({ explanation: explanationText })
             });
@@ -111,7 +120,10 @@ export default function DisputesPage() {
             const API_URL = getApiUrl();
             const response = await fetch(`${API_URL}/disputes/${transactionId}/resolve`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+                },
                 credentials: 'include',
                 body: JSON.stringify({ decision })
             });

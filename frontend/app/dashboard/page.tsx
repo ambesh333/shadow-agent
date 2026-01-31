@@ -17,6 +17,7 @@ export default function DashboardPage() {
                 const response = await fetch(`${API_URL}/auth/stats`, {
                     headers: {
                         'Content-Type': 'application/json',
+                        ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
                     },
                     credentials: 'include', // Send cookies
                 });
