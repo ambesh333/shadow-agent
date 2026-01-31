@@ -15,6 +15,7 @@ import authRoutes from './routes/authRoutes';
 import resourceRoutes from './routes/resourceRoutes';
 import gatewayRoutes from './routes/gatewayRoutes';
 import disputeRoutes from './routes/disputeRoutes';
+import exploreRoutes from './routes/exploreRoutes';
 
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -39,7 +40,7 @@ app.use(cors({
         }
     },
     credentials: true,
-    exposedHeaders: ['X-Receipt-Code', 'X-Auto-Settle-At', 'X-Merchant-Name', 'X-Transaction-ID']
+    exposedHeaders: ['X-Receipt-Code', 'X-Auto-Settle-At', 'X-Merchant-Name', 'X-Transaction-ID', 'X-Payment-Required', 'X-Payment-Amount', 'X-Payment-Token', 'X-Payment-Recipient', 'X-Payment-Network', 'X-Resource-ID']
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' })); // Increased for base64 images
@@ -49,6 +50,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/disputes', disputeRoutes);
+app.use('/api/explore', exploreRoutes);  // Public routes for AI agents
 
 // Basic health check
 app.get('/health', (req, res) => {

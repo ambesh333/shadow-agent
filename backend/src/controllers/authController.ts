@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import jwt from 'jsonwebtoken';
+import { calculateMerchantScore, calculateResourceScore, getScoreLabel } from '../utils/scoring';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const NONCE_EXPIRY_MINUTES = 5;
@@ -202,55 +203,77 @@ export const getMerchantStats = async (req: Request, res: Response) => {
             return res.status(401).json({ error: 'Not authenticated' });
         }
 
+        // Fetch merchant with all data needed for scoring
+        const merchant = await prisma.merchant.findUnique({
+            where: { id: merchantId },
+            include: {
+                resources: true,
+                transactions: true
+            }
+        });
+
+        if (!merchant) {
+            return res.status(404).json({ error: 'Merchant not found' });
+        }
+
         // Fetch funds in escrow (PENDING, DELIVERED, and REFUND_REQUESTED transactions)
         // These are confirmed payments held by facilitator but not yet settled/paid out
-        const pendingTransactions = await prisma.transaction.findMany({
-            where: {
-                merchantId,
-                status: { in: ['PENDING', 'DELIVERED', 'REFUND_REQUESTED'] }
-            },
-            select: { amount: true }
-        });
+        const pendingTransactions = merchant.transactions.filter(
+            tx => ['PENDING', 'DELIVERED', 'REFUND_REQUESTED'].includes(tx.status)
+        );
         const escrowBalance = pendingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
 
         // Fetch active disputes (REFUND_REQUESTED transactions)
-        const activeDisputes = await prisma.transaction.count({
-            where: {
-                merchantId,
-                status: 'REFUND_REQUESTED'
-            }
-        });
+        const activeDisputes = merchant.transactions.filter(tx => tx.status === 'REFUND_REQUESTED').length;
 
         // Fetch total settled sales
-        const settledTransactions = await prisma.transaction.findMany({
-            where: {
-                merchantId,
-                status: 'SETTLED'
-            },
-            select: { amount: true }
-        });
+        const settledTransactions = merchant.transactions.filter(tx => tx.status === 'SETTLED');
         const totalSales = settledTransactions.reduce((sum, tx) => sum + tx.amount, 0);
 
-        // --- NEW: Merchant Resources Analytics ---
-        // Fetch all resources for this merchant
-        const resources = await prisma.resource.findMany({
+        // === MERCHANT SCORE CALCULATION ===
+        const lostDisputes = merchant.transactions.filter(tx => tx.status === 'REFUNDED').length;
+        const merchantScore = calculateMerchantScore({
+            resourceCount: merchant.resources.length,
+            totalEarnings: totalSales,
+            totalTransactions: merchant.transactions.length,
+            lostDisputes,
+            createdAt: merchant.createdAt
+        });
+        const merchantScoreLabel = getScoreLabel(merchantScore);
+
+        // --- Merchant Resources Analytics ---
+        // Fetch all resources for this merchant with transactions
+        const resourcesWithTx = await prisma.resource.findMany({
             where: { merchantId },
             include: {
-                transactions: true // Inefficient for large datasets but simple for now
+                transactions: true
             }
         });
 
-        // Calculate analytics
-        const resourcesAnalytics = resources.map(resource => {
+        // Calculate analytics with resource scores
+        const resourcesAnalytics = resourcesWithTx.map(resource => {
             const accessCount = resource.transactions.length;
-            const disputeCount = resource.transactions.filter(tx => tx.status === 'REFUND_REQUESTED').length;
+            const resourceLostDisputes = resource.transactions.filter(tx => tx.status === 'REFUNDED').length;
+            const activeResourceDisputes = resource.transactions.filter(tx => tx.status === 'REFUND_REQUESTED').length;
+
+            // Calculate resource score
+            const resourceScore = calculateResourceScore({
+                accessCount,
+                settledDisputes: resourceLostDisputes,
+                activeDisputes: activeResourceDisputes,
+                merchantScore,
+                createdAt: resource.createdAt,
+                totalTransactions: accessCount
+            });
 
             return {
                 id: resource.id,
                 title: resource.title,
                 type: resource.type,
                 accessCount,
-                disputeCount
+                lostDisputes: resourceLostDisputes,
+                trustScore: resourceScore,
+                trustLabel: getScoreLabel(resourceScore).label
             };
         });
 
@@ -261,6 +284,9 @@ export const getMerchantStats = async (req: Request, res: Response) => {
             escrowBalance,
             activeDisputes,
             totalSales,
+            merchantScore,
+            merchantScoreLabel: merchantScoreLabel.label,
+            merchantScoreColor: merchantScoreLabel.color,
             resourcesAnalytics
         });
     } catch (error) {

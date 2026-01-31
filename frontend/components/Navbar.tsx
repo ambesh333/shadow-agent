@@ -19,8 +19,8 @@ export default function Navbar() {
 
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center gap-6">
-                        <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition-colors">
-                            Dashboard
+                        <Link href="/documentation" className="text-sm text-gray-400 hover:text-white transition-colors">
+                            Documentation
                         </Link>
                         <Link href="/dashboard/demo" className="text-sm text-gray-400 hover:text-white transition-colors">
                             Demo
