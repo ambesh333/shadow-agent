@@ -17,6 +17,7 @@ interface AuthContextType {
     isAuthenticated: boolean;
     signIn: () => Promise<void>;
     signOut: () => Promise<void>;
+    getToken: () => string | null;
     error: string | null;
 }
 
@@ -43,9 +44,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (res.ok) {
                 const data = await res.json();
                 setUser(data.user);
+                // Also cache token if returned (though /me usually doesn't return it, verification does)
+                if (data.token) {
+                    localStorage.setItem('auth_token', data.token);
+                }
+            } else {
+                // If /me fails, we might still have a token locally that is valid,
+                // but if the cookie failed, /me fails.
+                // We should probably clear local token if /me fails to ensure consistency
+                localStorage.removeItem('auth_token');
             }
         } catch (e) {
             // Not authenticated, that's fine
+            localStorage.removeItem('auth_token');
         } finally {
             setIsLoading(false);
         }
@@ -112,7 +123,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error(data.error || 'Verification failed');
             }
 
-            const { user: userData } = await verifyRes.json();
+            const { user: userData, token } = await verifyRes.json();
+
+            // Store token for header-based auth fallback
+            if (token) {
+                localStorage.setItem('auth_token', token);
+            }
+
             setUser(userData);
 
         } catch (e: any) {
@@ -130,10 +147,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 credentials: 'include'
             });
-            setUser(null);
-            disconnect();
         } catch (e) {
             console.error('Logout error:', e);
+        } finally {
+            // Always clear local state
+            localStorage.removeItem('auth_token');
+            setUser(null);
+            disconnect();
         }
     }, [disconnect]);
 
@@ -144,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isAuthenticated: !!user,
             signIn,
             signOut,
+            getToken: () => typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null,
             error
         }}>
             {children}

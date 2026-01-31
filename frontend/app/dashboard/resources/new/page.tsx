@@ -70,7 +70,10 @@ export default function NewResourcePage() {
             const API_URL = getApiUrl();
             const res = await fetch(`${API_URL}/resources`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+                },
                 credentials: 'include',
                 body: JSON.stringify({
                     title: title.trim(),

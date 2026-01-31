@@ -8,7 +8,15 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
  */
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
     try {
-        const token = req.cookies?.session_token;
+        let token = req.cookies?.session_token;
+
+        // Fallback: Check Authorization header
+        if (!token && req.headers.authorization) {
+            const authHeader = req.headers.authorization;
+            if (authHeader.startsWith('Bearer ')) {
+                token = authHeader.substring(7);
+            }
+        }
 
         if (!token) {
             return res.status(401).json({ error: 'Authentication required' });

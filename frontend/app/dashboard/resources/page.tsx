@@ -194,8 +194,10 @@ export default function ResourcesPage() {
         try {
             setIsLoading(true);
             const API_URL = getApiUrl();
+            const token = localStorage.getItem('auth_token');
             const res = await fetch(`${API_URL}/resources`, {
-                credentials: 'include'
+                credentials: 'include',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : undefined
             });
 
             if (!res.ok) throw new Error('Failed to fetch resources');
@@ -217,7 +219,8 @@ export default function ResourcesPage() {
             const API_URL = getApiUrl();
             const res = await fetch(`${API_URL}/resources/${deleteId}`, {
                 method: 'DELETE',
-                credentials: 'include'
+                credentials: 'include',
+                headers: localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : undefined
             });
 
             if (!res.ok) throw new Error('Failed to delete resource');

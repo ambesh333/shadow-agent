@@ -171,7 +171,8 @@ export const verifySignature = async (req: Request, res: Response) => {
                 walletAddress: merchant.walletAddress,
                 displayName: merchant.displayName,
                 isNewUser: !merchant.displayName
-            }
+            },
+            token // Return token for client-side storage (fallback for cross-site cookies)
         });
     } catch (error) {
         console.error('Verification error:', error);
