@@ -19,9 +19,8 @@ export default function NewResourcePage() {
     const [url, setUrl] = useState('');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageData, setImageData] = useState<string | null>(null);
-    const [network, setNetwork] = useState<'MAINNET' | 'DEVNET'>('MAINNET');
-    const [token, setToken] = useState<'NATIVE' | 'USDC' | 'USDT'>('NATIVE');
-    const [mintAddress, setMintAddress] = useState('');
+    const [network] = useState<'MAINNET'>('MAINNET');
+    const [token] = useState<'NATIVE'>('NATIVE');
     const [autoApprovalMinutes, setAutoApprovalMinutes] = useState('60');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -82,7 +81,7 @@ export default function NewResourcePage() {
                     price: parseFloat(price) || 0,
                     network,
                     token,
-                    mintAddress: token === 'NATIVE' ? undefined : mintAddress.trim(),
+                    mintAddress: undefined,
                     imageData: type === 'IMAGE' ? imageData : undefined,
                     url: type !== 'IMAGE' ? url.trim() : undefined,
                     autoApprovalMinutes: parseInt(autoApprovalMinutes) || 60,
@@ -186,65 +185,23 @@ export default function NewResourcePage() {
                             />
                         </div>
 
-                        {/* Network Selector */}
+                        {/* Network & Token Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 ml-1">Network</label>
-                                <div className="relative">
-                                    <select
-                                        value={network}
-                                        onChange={(e) => {
-                                            const val = e.target.value as 'MAINNET' | 'DEVNET';
-                                            setNetwork(val);
-                                            if (val === 'DEVNET') setToken('NATIVE');
-                                        }}
-                                        className="w-full px-5 py-4 bg-black/50 border border-white/10 rounded-xl text-[#F4F4F5] appearance-none focus:outline-none focus:border-[#FFB657] transition-all"
-                                    >
-                                        <option value="MAINNET">Solana Mainnet</option>
-                                        <option value="DEVNET">Solana Devnet</option>
-                                    </select>
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                                        ▼
-                                    </div>
+                                <div className="px-5 py-4 bg-black/50 border border-white/10 rounded-xl text-[#F4F4F5] flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                    Solana Mainnet
                                 </div>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 ml-1">Token</label>
-                                <div className="relative">
-                                    <select
-                                        value={token}
-                                        onChange={(e) => setToken(e.target.value as any)}
-                                        className="w-full px-5 py-4 bg-black/50 border border-white/10 rounded-xl text-[#F4F4F5] appearance-none focus:outline-none focus:border-[#FFB657] transition-all"
-                                    >
-                                        <option value="NATIVE">SOL (Native)</option>
-                                        {network === 'MAINNET' && (
-                                            <>
-                                                <option value="USDC">USDC</option>
-                                                <option value="USDT">USDT</option>
-                                            </>
-                                        )}
-                                    </select>
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                                        ▼
-                                    </div>
+                                <div className="px-5 py-4 bg-black/50 border border-white/10 rounded-xl text-[#F4F4F5]">
+                                    SOL (Native)
                                 </div>
                             </div>
                         </div>
-
-                        {/* Mint Address (if SPL) */}
-                        {token !== 'NATIVE' && (
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 ml-1">SPL Token Mint Address</label>
-                                <input
-                                    type="text"
-                                    value={mintAddress}
-                                    onChange={(e) => setMintAddress(e.target.value)}
-                                    placeholder="Leave empty for standard USDC/USDT"
-                                    className="w-full px-5 py-4 bg-black/50 border border-white/10 rounded-xl text-[#F4F4F5] placeholder-gray-600 focus:outline-none focus:border-[#FFB657] transition-all"
-                                />
-                            </div>
-                        )}
 
                         {/* Price */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

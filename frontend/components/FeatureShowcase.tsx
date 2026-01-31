@@ -29,6 +29,13 @@ const features: FeatureItem[] = [
         description: 'When disputes arise, our AI analyzes delivery proof, merchant responses, and context to provide fair decisions. See confidence scores, reasoning, and resolve cases with a single click.',
         imageSrc: '/screenshots/disputes.png',
         imageAlt: 'AI Dispute Resolution'
+    },
+    {
+        title: 'Trust Score Algorithm',
+        subtitle: 'Build Your Reputation',
+        description: 'Every resource and merchant gets a dynamic trust score (0-100). We weight success rates, transaction history, dispute outcomes, and account age—so agents can confidently choose quality resources while new merchants start fair.',
+        imageSrc: '/screenshots/trustscore.png',
+        imageAlt: 'Trust Score System'
     }
 ];
 

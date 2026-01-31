@@ -105,7 +105,7 @@ export default function DocumentationPage() {
                                 Shadow <span className="text-[#FF8E40]">Agent</span> Documentation
                             </h1>
                             <p className="text-gray-400 text-lg leading-relaxed mb-6">
-                                Shadow Agent is the first privacy-preserving marketplace where AI agents can purchase digital resources using zero-knowledge proofs on Solana. Built on top of Shadow Wire, it enables autonomous AI agents to make payments while keeping transaction amounts completely private.
+                                Shadow Agent is the first privacy-preserving marketplace where AI agents can purchase digital resources using zero-knowledge proofs on Solana. Unlike existing x402 implementations, we provide <span className="text-[#FF8E40] font-semibold">AI-powered dispute resolution</span> with escrow protection—ensuring fair outcomes when resources don't match descriptions. Built on Shadow Wire for private payments.
                             </p>
                             <div className="flex gap-4">
                                 <Link href="/dashboard" className="px-6 py-3 bg-[#FF8E40] hover:bg-[#FF5832] text-white font-medium rounded-xl transition-colors">
@@ -475,20 +475,16 @@ X-Resource-ID: abc123`}</pre>
 
                             <div className="space-y-4">
                                 <div className="bg-gradient-to-r from-[#FF8E40]/10 to-transparent rounded-xl border border-[#FF8E40]/20 p-5">
-                                    <h4 className="text-white font-semibold mb-2">🔗 Multi-Chain Support</h4>
-                                    <p className="text-gray-400 text-sm">Expand beyond Solana to support Ethereum, Base, and other EVM chains.</p>
-                                </div>
-                                <div className="bg-gradient-to-r from-[#FF8E40]/10 to-transparent rounded-xl border border-[#FF8E40]/20 p-5">
                                     <h4 className="text-white font-semibold mb-2">🪙 Multi-Token Payments</h4>
-                                    <p className="text-gray-400 text-sm">Support for USDC, USDT, and other stablecoins alongside SOL.</p>
+                                    <p className="text-gray-400 text-sm">Support for USDC, USDT, USD1 and other stablecoins alongside SOL using Shadow Wire.</p>
                                 </div>
                                 <div className="bg-gradient-to-r from-[#FF8E40]/10 to-transparent rounded-xl border border-[#FF8E40]/20 p-5">
-                                    <h4 className="text-white font-semibold mb-2">📦 SDK & Libraries</h4>
-                                    <p className="text-gray-400 text-sm">NPM packages for easy integration into AI agent frameworks.</p>
+                                    <h4 className="text-white font-semibold mb-2">📊 Prediction Market Insights</h4>
+                                    <p className="text-gray-400 text-sm">Top prediction market traders can monetize their event theories and analysis. AI agents purchase these insights to make smarter predictions on market events.</p>
                                 </div>
                                 <div className="bg-gradient-to-r from-[#FF8E40]/10 to-transparent rounded-xl border border-[#FF8E40]/20 p-5">
-                                    <h4 className="text-white font-semibold mb-2">🤖 Agent Framework Plugins</h4>
-                                    <p className="text-gray-400 text-sm">Native plugins for LangChain, AutoGPT, and other popular frameworks.</p>
+                                    <h4 className="text-white font-semibold mb-2">🧠 ML Price Prediction Models</h4>
+                                    <p className="text-gray-400 text-sm">Merchants deploy ML models for crypto price predictions. AI trading agents access these forecasts through private payments for smarter trading decisions.</p>
                                 </div>
                             </div>
                         </section>
