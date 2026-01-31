@@ -147,9 +147,11 @@ export default function DisputesPage() {
             return <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-500/20 text-gray-400 border border-gray-500/30">Pending</span>;
         }
         if (dispute.aiDecision === 'AI_VALID') {
-            return <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30">Valid</span>;
+            // Valid dispute = Agent is right, Merchant at fault = RED (bad for merchant)
+            return <span className="px-3 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400 border border-red-500/30">Valid</span>;
         }
-        return <span className="px-3 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400 border border-red-500/30">Invalid</span>;
+        // Invalid dispute = Agent was wrong, Merchant is fine = GREEN (good for merchant)
+        return <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30">Invalid</span>;
     };
 
     // ============= DETAIL CARD VIEW =============
@@ -180,15 +182,15 @@ export default function DisputesPage() {
 
                     {/* Main Card */}
                     <div className="relative bg-gradient-to-br from-[#1a1a1a] via-[#141414] to-[#0f1a0f] rounded-3xl border border-white/10 overflow-hidden">
-                        {/* Glow Effect */}
-                        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[200px] rounded-full blur-[100px] opacity-30 ${isDisputeValid ? 'bg-green-500' : 'bg-red-500'
+                        {/* Glow Effect - Red for valid (bad for merchant), Green for invalid (good for merchant) */}
+                        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[200px] rounded-full blur-[100px] opacity-30 ${isDisputeValid ? 'bg-red-500' : 'bg-green-500'
                             }`} />
 
                         {/* Card Header */}
                         <div className="relative p-6 flex items-center justify-between border-b border-white/5">
                             <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl ${isDisputeValid ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-                                    <Bot size={18} className={isDisputeValid ? 'text-green-400' : 'text-red-400'} />
+                                <div className={`p-2 rounded-xl ${isDisputeValid ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
+                                    <Bot size={18} className={isDisputeValid ? 'text-red-400' : 'text-green-400'} />
                                 </div>
                                 <span className="text-white font-medium">AI Insight</span>
                             </div>
@@ -210,7 +212,7 @@ export default function DisputesPage() {
                                     <span className="text-7xl font-extralight text-white tracking-tight">
                                         {confidence}%
                                     </span>
-                                    <ArrowUpRight size={24} className={`mt-3 ${isDisputeValid ? 'text-green-400' : 'text-red-400'}`} />
+                                    <ArrowUpRight size={24} className={`mt-3 ${isDisputeValid ? 'text-red-400' : 'text-green-400'}`} />
                                 </div>
                             </div>
 
@@ -289,14 +291,14 @@ export default function DisputesPage() {
                                             </button>
                                         </>
                                     ) : (
-                                        /* Invalid Dispute: Just Reject Claim */
+                                        /* Invalid Dispute: Merchant wins - Close the case (positive action) */
                                         <button
                                             onClick={() => handleResolve(dispute.id, 'REJECT')}
                                             disabled={isResolving}
-                                            className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-900/30"
+                                            className="w-full py-3.5 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-900/30"
                                         >
-                                            {isResolving ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
-                                            Reject Claim
+                                            {isResolving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                                            Close Case
                                         </button>
                                     )}
                                 </div>
