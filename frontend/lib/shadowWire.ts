@@ -9,7 +9,7 @@ let _shadowWireInstance: ShadowWireClient | null = null;
 export const getShadowWire = (): ShadowWireClient => {
     if (!_shadowWireInstance) {
         _shadowWireInstance = new ShadowWireClient({
-            apiBaseUrl: SHADOWWIRE_API_URL,
+            apiBaseUrl: 'https://shadow.radr.fun/shadowpay/api',
             debug: process.env.NODE_ENV === 'development',
         });
     }
