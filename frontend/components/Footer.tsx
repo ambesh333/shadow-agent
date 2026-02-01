@@ -44,8 +44,8 @@ export default function Footer() {
                         <h4 className="text-white font-medium mb-4">Developers</h4>
                         <ul className="space-y-3">
                             <li><a href="https://github.com/ambesh333/shadow-agent" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white text-sm transition-colors">GitHub</a></li>
-                            <li><a href="#" className="text-gray-500 hover:text-white text-sm transition-colors">Documentation</a></li>
-                            <li><a href="#" className="text-gray-500 hover:text-white text-sm transition-colors">API Reference</a></li>
+                            <li><Link href="/documentation" className="text-gray-500 hover:text-white text-sm transition-colors">Documentation</Link></li>
+                            <li><Link href="/documentation#api" className="text-gray-500 hover:text-white text-sm transition-colors">API Reference</Link></li>
                         </ul>
                     </div>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 
 export default function Navbar() {
@@ -8,13 +9,17 @@ export default function Navbar() {
 
     return (
         <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-            <div className="backdrop-blur-md bg-black/40 border border-white/10 rounded-full px-8 py-3 shadow-xl shadow-black/20">
-                <div className="flex items-center gap-10">
+            <div className="backdrop-blur-md bg-black/40 border border-white/10 rounded-full pl-1 pr-8 py-1 shadow-xl shadow-black/20">
+                <div className="flex items-center gap-8">
                     {/* Logo */}
-                    <Link href="/" className="flex items-center gap-2">
-                        <span className="text-xl font-bold bg-gradient-to-r from-[#FF8E40] to-[#FFB657] bg-clip-text text-transparent">
-                            SA
-                        </span>
+                    <Link href="/" className="flex items-center">
+                        <Image
+                            src="/icon.svg"
+                            alt="Shadow Logo"
+                            width={90}
+                            height={90}
+                            className="rounded-full"
+                        />
                     </Link>
 
                     {/* Desktop Navigation */}

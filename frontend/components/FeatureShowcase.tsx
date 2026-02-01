@@ -1,10 +1,13 @@
 'use client';
 
+import Image from 'next/image';
+
 interface FeatureItem {
     title: string;
     subtitle: string;
     description: string;
-    imageSrc: string;
+    imageSrc?: string;
+    videoSrc?: string;
     imageAlt: string;
 }
 
@@ -13,28 +16,28 @@ const features: FeatureItem[] = [
         title: 'Merchant Dashboard',
         subtitle: 'Complete Control',
         description: 'Monitor your escrow balance, track settled sales, and manage active disputes all from one powerful dashboard. Real-time analytics show your top-performing resources and transaction history.',
-        imageSrc: '/screenshots/dashboard.png',
+        imageSrc: '/landing/merchant.png',
         imageAlt: 'Shadow Agent Dashboard'
     },
     {
         title: 'Agent Simulation',
         subtitle: 'Test Your Resources',
         description: 'Experience the payment flow from an AI agent\'s perspective. Our terminal-based demo lets you test x402 payment integration, deposit SOL to escrow, and access protected resources—all with zero-knowledge proofs.',
-        imageSrc: '/screenshots/simulation.png',
+        videoSrc: '/landing/simulation_demo.mp4',
         imageAlt: 'Agent Simulation Terminal'
     },
     {
         title: 'AI Dispute Analyzer',
         subtitle: 'Smart Resolution',
         description: 'When disputes arise, our AI analyzes delivery proof, merchant responses, and context to provide fair decisions. See confidence scores, reasoning, and resolve cases with a single click.',
-        imageSrc: '/screenshots/disputes.png',
+        videoSrc: '/landing/Ai_analyser.mp4',
         imageAlt: 'AI Dispute Resolution'
     },
     {
         title: 'Trust Score Algorithm',
         subtitle: 'Build Your Reputation',
         description: 'Every resource and merchant gets a dynamic trust score (0-100). We weight success rates, transaction history, dispute outcomes, and account age—so agents can confidently choose quality resources while new merchants start fair.',
-        imageSrc: '/screenshots/trustscore.png',
+        imageSrc: '/landing/trustScore.png',
         imageAlt: 'Trust Score System'
     }
 ];
@@ -66,17 +69,36 @@ export default function FeatureShowcase() {
                                 {/* Image */}
                                 <div className="flex-1 w-full">
                                     <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-[#FF8E40]/10">
-                                        {/* Placeholder for screenshot - replace with actual images */}
-                                        <div className="aspect-video bg-gradient-to-br from-[#1a1a1a] to-[#0d0d0d] flex items-center justify-center">
-                                            <div className="text-center p-8">
-                                                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#FF8E40]/20 flex items-center justify-center">
-                                                    <svg className="w-8 h-8 text-[#FF8E40]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                    </svg>
+                                        <div className="aspect-video bg-gradient-to-br from-[#1a1a1a] to-[#0d0d0d] relative">
+                                            {feature.videoSrc ? (
+                                                <video
+                                                    src={feature.videoSrc}
+                                                    autoPlay
+                                                    loop
+                                                    muted
+                                                    playsInline
+                                                    className="absolute inset-0 w-full h-full object-cover"
+                                                />
+                                            ) : feature.imageSrc ? (
+                                                <Image
+                                                    src={feature.imageSrc}
+                                                    alt={feature.imageAlt}
+                                                    fill
+                                                    className="object-cover"
+                                                />
+                                            ) : (
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="text-center p-8">
+                                                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#FF8E40]/20 flex items-center justify-center">
+                                                            <svg className="w-8 h-8 text-[#FF8E40]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                            </svg>
+                                                        </div>
+                                                        <p className="text-gray-500 text-sm">{feature.imageAlt}</p>
+                                                        <p className="text-gray-600 text-xs mt-1">Screenshot placeholder</p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-gray-500 text-sm">{feature.imageAlt}</p>
-                                                <p className="text-gray-600 text-xs mt-1">Screenshot placeholder</p>
-                                            </div>
+                                            )}
                                         </div>
 
                                         {/* Glow effect */}
