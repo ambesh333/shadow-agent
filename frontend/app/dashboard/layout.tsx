@@ -25,6 +25,40 @@ export default function DashboardLayout({
 
     return (
         <div className="min-h-screen bg-black text-white">
+            <style jsx>{`
+                @keyframes marquee {
+                    0% { transform: translateX(100%); }
+                    100% { transform: translateX(-100%); }
+                }
+
+                .marquee-track {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3rem;
+                    white-space: nowrap;
+                    animation: marquee 18s linear infinite;
+                }
+            `}</style>
+
+            {/* Announcement Bar */}
+            <div className="bg-[#FF8E40] text-black border-b border-black/10">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="relative w-full py-1.5 overflow-hidden">
+                        <div className="marquee-track text-sm font-semibold">
+                            <span>📣 Shadow Agent MCP is out.</span>
+                            <span>🧩 Open claw skill coming soon.</span>
+                            <span>✨ New MCP tools is live</span>
+                            <Link href="/documentation" className="underline decoration-black/60 hover:decoration-black">
+                                🔗 Check out docs for integration.
+                            </Link>
+                            <span>📣 Shadow Agent MCP is out.</span>
+                            <span>🧩 Open claw skill coming soon.</span>
+                            <span>✨ New MCP tools is live</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Dashboard Navigation */}
             <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-sm border-b border-white/10">
                 <div className="max-w-7xl mx-auto px-6">
