@@ -11,6 +11,7 @@ const sections = [
     { id: 'shadowwire', title: 'Shadow Wire Integration' },
     { id: 'ai', title: 'AI-Powered Features' },
     { id: 'architecture', title: 'Architecture' },
+    { id: 'mcp', title: 'MCP Integration' },
     { id: 'api', title: 'API Reference' },
     { id: 'future', title: 'Future Integrations' },
 ];
@@ -318,10 +319,75 @@ export default function DocumentationPage() {
                             </div>
                         </section>
 
+                        {/* MCP Integration */}
+                        <section id="mcp" className="mb-20">
+                            <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
+                                <span className="w-8 h-8 bg-[#FF8E40]/20 rounded-lg flex items-center justify-center text-[#FF8E40] text-sm font-bold">6</span>
+                                MCP Integration
+                            </h2>
+
+                            <div className="rounded-2xl overflow-hidden border border-white/10 mb-6">
+                                <img src="/docs/banner2.jpg" alt="MCP Integration" className="w-full h-auto" />
+                            </div>
+
+                            <p className="text-gray-400 text-lg leading-relaxed mb-6">
+                                Shadow Agent exposes an MCP server over Streamable HTTP so agents can discover tools, read resources, and call actions programmatically.
+                            </p>
+
+                            <div className="bg-gradient-to-r from-[#FF8E40]/10 to-transparent rounded-xl border border-[#FF8E40]/20 p-4 mb-6">
+                                <p className="text-[#FFB657] text-sm font-mono">
+                                    Deployed MCP endpoint: <span className="text-white">https://shadow-backend-cwpb.onrender.com/mcp</span>
+                                </p>
+                                <p className="text-[#FFB657] text-sm font-mono mt-2">
+                                    Discovery: <span className="text-white">https://shadow-backend-cwpb.onrender.com/mcp/info</span>
+                                </p>
+                            </div>
+
+                            <div className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-6">
+                                <h3 className="text-xl font-semibold text-white mb-4">Compatibility Notes</h3>
+                                <ul className="space-y-3 text-gray-400 text-sm">
+                                    <li>JSON is accepted for `initialize`, `tools/list`, and `resources/list` without requiring `text/event-stream`.</li>
+                                    <li>Streaming responses still use SSE and require `Accept: text/event-stream`.</li>
+                                    <li>After initialization, include `mcp-session-id` and `mcp-protocol-version` headers on subsequent requests.</li>
+                                </ul>
+                            </div>
+
+                            <div className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-6">
+                                <h3 className="text-xl font-semibold text-white mb-4">Quick Start</h3>
+                                <div className="bg-black rounded-lg p-4">
+                                    <pre className="text-sm text-gray-400 overflow-x-auto">{`POST /mcp
+Accept: application/json
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {}
+  }
+}`}</pre>
+                                </div>
+                            </div>
+
+                            <div className="bg-[#111] rounded-2xl border border-white/10 p-6">
+                                <h3 className="text-xl font-semibold text-white mb-4">MCP Tools</h3>
+                                <p className="text-gray-400 text-sm mb-4">
+                                    Available tools include marketplace discovery and ShadowWire pool actions.
+                                </p>
+                                <ul className="space-y-3 text-gray-400 text-sm">
+                                    <li>`list_resources` and `get_resource` for marketplace discovery.</li>
+                                    <li>`get_payment_info` and `settle_transaction` for x402 flows.</li>
+                                    <li>`deposit_to_pool` and `get_pool_balance` for ShadowWire pool management.</li>
+                                </ul>
+                            </div>
+                        </section>
+
                         {/* API Reference */}
                         <section id="api" className="mb-20">
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-                                <span className="w-8 h-8 bg-[#FF8E40]/20 rounded-lg flex items-center justify-center text-[#FF8E40] text-sm font-bold">6</span>
+                                <span className="w-8 h-8 bg-[#FF8E40]/20 rounded-lg flex items-center justify-center text-[#FF8E40] text-sm font-bold">7</span>
                                 API Reference
                             </h2>
 
@@ -469,7 +535,7 @@ X-Resource-ID: abc123`}</pre>
                         {/* Future */}
                         <section id="future" className="mb-20">
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-                                <span className="w-8 h-8 bg-[#FF8E40]/20 rounded-lg flex items-center justify-center text-[#FF8E40] text-sm font-bold">7</span>
+                                <span className="w-8 h-8 bg-[#FF8E40]/20 rounded-lg flex items-center justify-center text-[#FF8E40] text-sm font-bold">8</span>
                                 Future Integrations
                             </h2>
 
