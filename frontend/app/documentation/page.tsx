@@ -327,7 +327,7 @@ export default function DocumentationPage() {
                             </h2>
 
                             <div className="rounded-2xl overflow-hidden border border-white/10 mb-6">
-                                <img src="/docs/banner2.jpg" alt="MCP Integration" className="w-full h-auto" />
+                                <img src="/landing/mcp.jpeg" alt="MCP Integration" className="w-full h-auto" />
                             </div>
 
                             <p className="text-gray-400 text-lg leading-relaxed mb-6">
