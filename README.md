@@ -206,6 +206,28 @@ Local: http://localhost:3001
 
 ---
 
+## 🤖 AI Agent Integration (MCP)
+
+Shadow Agent implements the **Model Context Protocol (MCP)**, allowing AI agents (like OpenClaw, Claude Desktop, or Cursor) to natively discover and interact with the marketplace.
+
+### MCP Server Config
+- **Endpoint:** `http://localhost:3001/mcp`
+- **Transport:** SSE (Server-Sent Events) over HTTP
+
+### Available Tools
+| Tool | Description |
+|------|-------------|
+| `list_resources` | Discover available resources with trust scores |
+| `get_resource` | Get details and pricing for a specific resource |
+| `get_payment_info` | Get x402 payment details (facilitator wallet, amount) |
+| `settle_transaction` | Settle or dispute a transaction after access |
+
+### Resources
+- `shadow://marketplace` - Marketplace statistics and metadata
+- `shadow://resources/{id}` - Individual resource details
+
+---
+
 ## 🎮 Demo
 
 📺 **Watch the Demo:** [YouTube Video](https://youtu.be/hSvzRYVPhOs?si=_fCbR1rBc39MFsPI)

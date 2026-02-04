@@ -16,6 +16,7 @@ import resourceRoutes from './routes/resourceRoutes';
 import gatewayRoutes from './routes/gatewayRoutes';
 import disputeRoutes from './routes/disputeRoutes';
 import exploreRoutes from './routes/exploreRoutes';
+import { setupMcpRoutes } from './mcp/mcpServer';
 
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -51,6 +52,9 @@ app.use('/api/resources', resourceRoutes);
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/explore', exploreRoutes);  // Public routes for AI agents
+
+// MCP Server for AI agent integration (Model Context Protocol)
+setupMcpRoutes(app);
 
 // Basic health check
 app.get('/health', (req, res) => {
