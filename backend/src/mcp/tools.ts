@@ -3,8 +3,17 @@
  * Exposes x402 payment gateway functionality as MCP tools
  */
 import { z } from 'zod';
+import { ShadowWireClient } from '@radr/shadowwire';
 import { prisma } from '../context';
 import { calculateResourceScore, calculateMerchantScore, getScoreLabel } from '../utils/scoring';
+
+const LAMPORTS_PER_SOL = 1_000_000_000;
+
+function resolveShadowWireApiBase(override?: string): string {
+    const base = (override || process.env.SHADOWWIRE_API_URL || process.env.SHADOWPAY_API_URL || 'https://shadow.radr.fun/shadowpay/api').trim();
+    const normalized = base.endsWith('/') ? base.slice(0, -1) : base;
+    return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
+}
 
 /**
  * Tool: list_resources
@@ -226,6 +235,98 @@ export const getPaymentInfoTool = {
 };
 
 /**
+ * Tool: deposit_to_pool
+ * Create an unsigned deposit transaction for the ShadowWire pool
+ */
+export const depositToPoolTool = {
+    name: 'deposit_to_pool',
+    description: 'Create an unsigned transaction to deposit SOL into the ShadowWire pool. The client must sign and submit the transaction on-chain.',
+    inputSchema: z.object({
+        wallet: z.string().describe('Solana wallet address to deposit from'),
+        amountSol: z.number().optional().describe('Amount in SOL (e.g., 0.1)'),
+        amountLamports: z.number().optional().describe('Amount in lamports (overrides amountSol if provided)'),
+        apiBaseUrl: z.string().optional().describe('Optional ShadowWire API base URL (defaults to env or https://shadow.radr.fun/shadowpay/api)'),
+        apiKey: z.string().optional().describe('Optional ShadowPay API key (only if required by the endpoint)')
+    }),
+    execute: async (args: { wallet: string; amountSol?: number; amountLamports?: number; apiBaseUrl?: string; apiKey?: string }) => {
+        const amountLamports = args.amountLamports ?? Math.floor((args.amountSol ?? 0) * LAMPORTS_PER_SOL);
+
+        if (!Number.isFinite(amountLamports) || amountLamports <= 0) {
+            return { error: 'amountLamports or amountSol must be a positive number' };
+        }
+
+        const apiBaseUrl = resolveShadowWireApiBase(args.apiBaseUrl);
+        const apiKey = args.apiKey || process.env.SHADOWPAY_API_KEY;
+
+        try {
+            const client = new ShadowWireClient({
+                apiBaseUrl,
+                apiKey
+            });
+
+            const response = await client.deposit({
+                wallet: args.wallet,
+                amount: amountLamports
+            });
+
+            const unsignedTxBase64 = (response as any)?.unsigned_tx_base64 || (response as any)?.transaction;
+
+            return {
+                wallet: args.wallet,
+                amountLamports,
+                amountSol: amountLamports / LAMPORTS_PER_SOL,
+                apiBaseUrl,
+                unsignedTxBase64,
+                response
+            };
+        } catch (error: any) {
+            return {
+                error: error?.message || 'Failed to create deposit transaction'
+            };
+        }
+    }
+};
+
+/**
+ * Tool: get_pool_balance
+ * Fetch pool balance for a wallet (optionally for a token)
+ */
+export const getPoolBalanceTool = {
+    name: 'get_pool_balance',
+    description: 'Get the ShadowWire pool balance for a wallet. Optionally filter by token (e.g., SOL, USDC).',
+    inputSchema: z.object({
+        wallet: z.string().describe('Solana wallet address to check'),
+        token: z.string().optional().describe('Optional token symbol (e.g., SOL, USDC)'),
+        apiBaseUrl: z.string().optional().describe('Optional ShadowWire API base URL (defaults to env or https://shadow.radr.fun/shadowpay/api)'),
+        apiKey: z.string().optional().describe('Optional ShadowPay API key (only if required by the endpoint)')
+    }),
+    execute: async (args: { wallet: string; token?: string; apiBaseUrl?: string; apiKey?: string }) => {
+        const apiBaseUrl = resolveShadowWireApiBase(args.apiBaseUrl);
+        const apiKey = args.apiKey || process.env.SHADOWPAY_API_KEY;
+
+        try {
+            const client = new ShadowWireClient({
+                apiBaseUrl,
+                apiKey
+            });
+
+            const balance = await client.getBalance(args.wallet, args.token as any);
+
+            return {
+                wallet: args.wallet,
+                token: args.token,
+                apiBaseUrl,
+                balance
+            };
+        } catch (error: any) {
+            return {
+                error: error?.message || 'Failed to fetch pool balance'
+            };
+        }
+    }
+};
+
+/**
  * Tool: settle_transaction
  * Settle or dispute a completed transaction
  */
@@ -281,5 +382,7 @@ export const allTools = [
     listResourcesTool,
     getResourceTool,
     getPaymentInfoTool,
+    depositToPoolTool,
+    getPoolBalanceTool,
     settleTransactionTool
 ];

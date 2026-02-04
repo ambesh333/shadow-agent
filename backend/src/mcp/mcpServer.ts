@@ -8,6 +8,58 @@ import { allTools } from './tools';
 import { allResources, allResourceTemplates } from './resources';
 import type { Express, Request, Response } from 'express';
 
+const JSON_FRIENDLY_METHODS = new Set([
+    'initialize',
+    'tools/list',
+    'resources/list'
+]);
+
+function extractRpcMethods(body: unknown): string[] {
+    if (!body) return [];
+    if (Array.isArray(body)) {
+        return body
+            .map((msg) => (msg && typeof msg === 'object' ? (msg as any).method : undefined))
+            .filter((method): method is string => typeof method === 'string');
+    }
+    if (typeof body === 'object' && (body as any).method) {
+        return [String((body as any).method)];
+    }
+    return [];
+}
+
+function shouldUseJsonResponse(body: unknown, acceptHeader: string | undefined): boolean {
+    const methods = extractRpcMethods(body);
+    if (methods.length === 0) return false;
+    const allJsonFriendly = methods.every((method) => JSON_FRIENDLY_METHODS.has(method));
+    if (!allJsonFriendly) return false;
+    const accept = acceptHeader ?? '';
+    return !accept.includes('text/event-stream');
+}
+
+function ensureAcceptHeader(req: Request) {
+    const current = req.headers['accept'];
+    const parts = new Set(
+        (current ? current.split(',') : [])
+            .map((part) => part.trim())
+            .filter(Boolean)
+    );
+    parts.add('application/json');
+    parts.add('text/event-stream');
+    (req.headers as any)['accept'] = Array.from(parts).join(', ');
+}
+
+function getEnableJsonResponse(transport: StreamableHTTPServerTransport): boolean {
+    const webTransport = (transport as any)?._webStandardTransport;
+    return Boolean(webTransport?._enableJsonResponse);
+}
+
+function setEnableJsonResponse(transport: StreamableHTTPServerTransport, enabled: boolean) {
+    const webTransport = (transport as any)?._webStandardTransport;
+    if (webTransport) {
+        webTransport._enableJsonResponse = enabled;
+    }
+}
+
 // Create MCP Server instance
 const mcpServer = new McpServer({
     name: 'shadow-agent',
@@ -133,7 +185,22 @@ export function setupMcpRoutes(app: Express) {
 
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
-            await transport.handleRequest(req, res);
+
+            const useJsonResponse = shouldUseJsonResponse(req.body, req.headers['accept']);
+            const previousJsonMode = getEnableJsonResponse(transport);
+
+            if (useJsonResponse) {
+                setEnableJsonResponse(transport, true);
+                ensureAcceptHeader(req);
+            } else {
+                setEnableJsonResponse(transport, false);
+            }
+
+            try {
+                await transport.handleRequest(req, res, req.body);
+            } finally {
+                setEnableJsonResponse(transport, previousJsonMode);
+            }
 
         } else if (req.method === 'DELETE') {
             // Session cleanup
